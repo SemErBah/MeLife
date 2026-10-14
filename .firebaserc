@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "medebit"
+  },
+  "targets": {
+    "medebit": {
+      "hosting": {
+        "melife": [
+          "melife-app"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

@@ -1,0 +1,13 @@
+{
+  "name": "melife-worker",
+  "private": true,
+  "type": "module",
+  "description": "MeLife Telegram anımsatıcıları (GitHub Actions ile çalışır)",
+  "scripts": {
+    "start": "tsx reminders.ts"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.10.0",
+    "tsx": "^4.23.15"
+  }
+}

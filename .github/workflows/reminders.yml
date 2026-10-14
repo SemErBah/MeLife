@@ -1,0 +1,32 @@
+# MeLife Telegram anımsatıcıları — her 5 dakikada bir (GitHub zamanlayıcısı birkaç dakika gecikebilir)
+name: MeLife anımsatıcılar
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: reminders
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - name: Bağımlılıklar
+        working-directory: worker
+        run: npm ci --no-audit --no-fund
+      - name: Anımsatıcıları gönder
+        working-directory: worker
+        run: npx tsx reminders.ts
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
