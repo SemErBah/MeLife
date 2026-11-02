@@ -88,7 +88,8 @@ export default function Week() {
 
 function DayCard({ date, today }: { date: string; today: string }) {
   const count = useStore((s) => s.tasks.filter((t) => t.forDate === date).length);
-  const exams = useStore((s) => s.exams.filter((e) => e.date === date));
+  const allExams = useStore((s) => s.exams);
+  const exams = useMemo(() => allExams.filter((e) => e.date === date), [allExams, date]);
   const courses = useStore((s) => s.courses);
   const openMore = useStore((s) => s.openMore);
   const closed = useStore((s) => !!s.days[date]?.closedAt);

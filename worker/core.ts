@@ -171,32 +171,8 @@ export function planUserMessages(x: UserInput): Outgoing[] {
   return out;
 }
 
-/* ── Gelen mesajlar ────────────────────────────────────── */
-
-export type Incoming = { kind: 'journal'; text: string } | { kind: 'inbox'; text: string } | { kind: 'help' };
-
-/** "/g metin" → günlük; düz metin → Aklımdakiler; /yardim → yardım. Diğer komutlar yok sayılır. */
-export function parseIncoming(raw: string): Incoming | null {
-  const text = raw.trim();
-  if (!text) return null;
-  const cmd = text.match(/^\/([\p{L}_]+)(?:@\w+)?(?:\s+([\s\S]*))?$/u);
-  if (cmd) {
-    const [, name, rest = ''] = cmd;
-    const n = name.toLocaleLowerCase('tr-TR');
-    if (n === 'g' || n === 'gunluk' || n === 'günlük') return rest.trim() ? { kind: 'journal', text: rest.trim() } : { kind: 'help' };
-    if (n === 'yardim' || n === 'help') return { kind: 'help' };
-    return null;
-  }
-  return { kind: 'inbox', text: text.slice(0, 500) };
-}
-
-export const HELP = [
-  'Bana yazabileceklerin:',
-  "• Düz bir mesaj → <b>Aklımdakiler</b>'e eklenir",
-  '• <b>/g</b> metin → <b>günlüğüne</b> yazılır (ör. /g Bugün sahada arızayı çözdük #saha)',
-  '',
-  'Anımsatıcıların düğmeleriyle de kayıt yapabilirsin.',
-].join('\n');
+/** Bota yazılan düz mesajlara tek cevap: bot yalnızca anımsatıcı gönderir */
+export const ONLY_NOTIFY = 'Ben yalnızca anımsatıcı gönderiyorum 🙂 Kayıtlarını MeLife uygulamasından ekleyebilirsin.';
 
 /* ── Düğme yanıtları ───────────────────────────────────── */
 

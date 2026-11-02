@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Settings, Task, Tracker } from '../src/types';
-import { doneValue, inWindow, isQuiet, istanbulClock, parseAction, parseIncoming, planUserMessages, type UserInput } from './core';
+import { doneValue, inWindow, isQuiet, istanbulClock, parseAction, planUserMessages, type UserInput } from './core';
 
 const S = (p: Partial<Settings> = {}): Settings => ({ onboarded: true, dayStartHour: 4, theme: 'dark', startDate: '2026-10-01', showStreak: false, ...p });
 const tr = (p: Partial<Tracker>): Tracker => ({ id: 'dis', name: 'Diş fırçala', icon: 'brush', category: 'order', type: 'check', order: 0, active: true, reminders: [{ time: '07:15', on: true }], ...p });
@@ -80,15 +80,7 @@ describe('düğmeler', () => {
   });
 });
 
-describe('gelen mesajlar', () => {
-  it('/g günlüğe, düz metin Aklımdakiler\'e', () => {
-    expect(parseIncoming('/g Bugün sahada arızayı çözdük')).toEqual({ kind: 'journal', text: 'Bugün sahada arızayı çözdük' });
-    expect(parseIncoming('/günlük güzel gün')).toEqual({ kind: 'journal', text: 'güzel gün' });
-    expect(parseIncoming('/g@MeLifeBot not')).toEqual({ kind: 'journal', text: 'not' });
-    expect(parseIncoming('inverter garantisini bul')).toEqual({ kind: 'inbox', text: 'inverter garantisini bul' });
-    expect(parseIncoming('/g')).toEqual({ kind: 'help' });
-    expect(parseIncoming('/bilinmeyen')).toBeNull();
-  });
+describe('kişi düğmesi', () => {
   it('kişi düğmesi ayrışır', () => {
     expect(parseAction('p|abc|2026-10-14')).toEqual({ kind: 'contact', personId: 'abc', date: '2026-10-14' });
   });

@@ -44,6 +44,6 @@ export interface Update {
   callback_query?: { id: string; data?: string; message?: { chat: { id: number }; message_id: number; text?: string } };
 }
 
-export function getUpdates(offset: number) {
-  return call<Update[]>('getUpdates', { offset, timeout: 0, allowed_updates: ['message', 'callback_query'] });
+export function getUpdates(offset: number, waitSec = 0) {
+  return call<Update[]>('getUpdates', { offset, timeout: waitSec, allowed_updates: ['message', 'callback_query'] });
 }

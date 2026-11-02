@@ -1,9 +1,10 @@
-import { CalendarClock, GraduationCap, Plus, Trash2 } from 'lucide-react';
+import { CalendarClock, GraduationCap, Play, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import Modal from '../../components/Modal';
 import { COURSE_STATUS, EXAM_KIND } from '../../constants';
 import { Field, ProgressBar } from '../../components/ui';
 import { useStore } from '../../store/useStore';
+import { useTimer } from '../../store/useTimer';
 import { confirmAction, run } from '../../store/useUI';
 import type { Course, CourseStatus, Exam, ExamKind } from '../../types';
 import { daysBetween, fmtMinutes, longDate, shortDate, weekDays } from '../../utils/date';
@@ -17,6 +18,8 @@ export default function Courses() {
   const today = useStore((s) => s.today());
   const [edit, setEdit] = useState<Edit>(null);
   const [showPast, setShowPast] = useState(false);
+  const startStudy = useTimer((s) => s.startStudy);
+  const busy = useTimer((s) => !!s.running);
 
   const week = weekDays(today);
   const minutes = useMemo(() => {
@@ -38,15 +41,18 @@ export default function Courses() {
 
   return (
     <div className="space-y-5">
-      {/* Özet */}
-      {courses.length > 0 && (
-        <section className="now-card space-y-3">
-          <p className="eyebrow">İlerleme</p>
-          <p className="text-3xl font-extrabold num">{passed} <span className="text-lg text-text-muted font-semibold">/ {courses.length} ders geçti</span></p>
-          <ProgressBar pct={(passed / courses.length) * 100} color="var(--accent-base)" height={6} />
-          <p className="text-sm text-text-muted">Bu hafta <b className="text-text-main">{fmtMinutes(minutes.weekSum)}</b> ders çalıştın.</p>
-        </section>
-      )}
+      {/* Özet + çalışma sayacı */}
+      <section className="now-card space-y-3">
+        {courses.length > 0 && (
+          <>
+            <p className="eyebrow">İlerleme</p>
+            <p className="text-3xl font-extrabold num">{passed} <span className="text-lg text-text-muted font-semibold">/ {courses.length} ders geçti</span></p>
+            <ProgressBar pct={(passed / courses.length) * 100} color="var(--accent-base)" height={6} />
+          </>
+        )}
+        <p className="text-sm text-text-muted">Bu hafta <b className="text-text-main">{fmtMinutes(minutes.weekSum)}</b> ders çalıştın.</p>
+        <button onClick={() => startStudy()} disabled={busy} className="btn btn-primary w-full"><Play size={16} fill="currentColor" /> {busy ? 'Bir sayaç zaten açık' : 'Çalışmaya başla'}</button>
+      </section>
 
       {/* Sınavlar */}
       <section className="widget">
@@ -110,6 +116,14 @@ export default function Courses() {
                     </span>
                   </span>
                   <span className={`pill shrink-0 ${c.status === 'passed' ? 'active' : ''}`} style={{ minHeight: 28, padding: '3px 10px' }}>{STATUS[c.status]}</span>
+                  {c.status === 'taking' && !busy && (
+                    <span role="button" tabIndex={0} aria-label={`${c.name}: çalışmaya başla`}
+                      onClick={(e) => { e.stopPropagation(); startStudy(c.id); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); startStudy(c.id); } }}
+                      className="check-btn shrink-0" style={{ color: 'var(--accent-base)' }}>
+                      <Play size={16} className="ml-0.5" fill="currentColor" />
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

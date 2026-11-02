@@ -5,12 +5,12 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        // Kütüphaneler ayrı dosyada: uygulama güncellenince tarayıcı bunları önbellekten kullanır
-        manualChunks(id: string) {
-          if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) return 'firebase';
-          if (id.includes('node_modules')) return 'vendor';
+        // Firebase ayrı dosyada (ESM, uygulamaya bağımlı değil). React vb. CommonJS kütüphaneleri ayrı
+        // dosyaya bölünmez: paketleyicinin yardımcı kodu uygulama dosyasında kalıp döngü yaratıyor ve açılışta çöküyordu.
+        codeSplitting: {
+          groups: [{ name: 'firebase', test: /node_modules[\/](firebase|@firebase)/ }],
         },
       },
     },

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, Banknote, BookHeart, Lightbulb, ListTodo, Minus, Plus, Repeat } from 'lucide-react';
+import { ArrowLeftRight, Banknote, BookHeart, GraduationCap, Lightbulb, ListTodo, Minus, Plus, Repeat } from 'lucide-react';
 import { useState } from 'react';
 import { CATEGORIES } from '../constants';
 import { TrackerIcon } from './TrackerIcon';
@@ -7,6 +7,7 @@ import { useMoneySheets, type MoneySheet } from '../finance/store/useMoneySheets
 import { useDay } from '../hooks/useDay';
 import { useSheets } from '../store/useSheets';
 import { useStore } from '../store/useStore';
+import { useTimer } from '../store/useTimer';
 import { run } from '../store/useUI';
 import Modal from './Modal';
 import { useLogContact } from '../hooks/useLogContact';
@@ -49,6 +50,8 @@ function Body({ onMoney }: { onMoney: (s: MoneySheet) => void }) {
   const { items } = useDay(today);
   const { openTracker, openTask, setQuick } = useSheets();
   const [text, setText] = useState('');
+  const startStudy = useTimer((s) => s.startStudy);
+  const busy = useTimer((s) => !!s.running);
 
   const saveNote = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +65,7 @@ function Body({ onMoney }: { onMoney: (s: MoneySheet) => void }) {
       <div className="grid grid-cols-2 gap-2">
         <button onClick={() => openTask(null)} className="btn btn-primary py-3.5"><ListTodo size={18} /> Görev</button>
         <button onClick={() => { setQuick(false); useStore.getState().setTab('notes'); }} className="btn btn-ghost py-3.5"><BookHeart size={18} /> Günlüğe yaz</button>
+        {!busy && <button onClick={() => { setQuick(false); startStudy(); }} className="btn btn-ghost py-3.5 col-span-2"><GraduationCap size={18} /> Ders çalışmaya başla</button>}
       </div>
 
       <TalkedTo />

@@ -41,7 +41,7 @@ export default function TimerOverlay() {
   const goal = (tracker?.target ?? 60) * 60;
   const inWarmup = elapsed < first;
   const pct = inWarmup ? elapsed / first : isTask ? 1 : Math.min(1, elapsed / goal);
-  const showCourses = !!tracker && (tracker.key === 'study' || tracker.category === 'mind') && courses.length > 0;
+  const showCourses = (running.study || (!!tracker && (tracker.key === 'study' || tracker.category === 'mind'))) && courses.length > 0;
 
   const cancel = async () => {
     if (elapsed < 60 || await confirmAction({ title: 'Sayaç kapatılsın mı?', message: isTask ? 'Sorun değil, başlamak bile bir adımdı.' : 'Bu süre kaydedilmeyecek.', confirmLabel: 'Kapat', danger: !isTask })) {
