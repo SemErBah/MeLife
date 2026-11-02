@@ -9,7 +9,7 @@ import type { InboxItem } from '../types';
 import { addDays, shortDate, toKey, weekStart } from '../utils/date';
 
 /** Aklımdakiler: kafandakini boşalt, sonra istediğin zaman göreve çevir */
-export default function Notes() {
+export default function Notes({ embedded }: { embedded?: boolean }) {
   const { inbox, addInbox } = useStore();
   const [text, setText] = useState('');
   const [showArchived, setShowArchived] = useState(false);
@@ -33,8 +33,8 @@ export default function Notes() {
   };
 
   return (
-    <div className="page max-w-3xl">
-      <PageHeader title="Notlar" subtitle="Aklına geleni yaz, sonra karar verirsin." action={<ProfileButton />} />
+    <div className={embedded ? 'space-y-[1.75rem]' : 'page max-w-3xl'}>
+      {!embedded && <PageHeader title="Notlar" subtitle="Aklına geleni yaz, sonra karar verirsin." action={<ProfileButton />} />}
 
       <form onSubmit={submit} className="flex gap-2">
         <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Ör: inverter garanti belgesini bul" maxLength={240} enterKeyHint="send" />

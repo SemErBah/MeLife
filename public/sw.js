@@ -1,5 +1,5 @@
 /* MeLife service worker — uygulama kabuğunu önbellekler, veriler Firestore'un kendi önbelleğinde. */
-const CACHE = 'melife-v4';
+const CACHE = 'melife-v5';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/manifest.json', '/favicon.svg'])));

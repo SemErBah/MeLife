@@ -112,6 +112,7 @@ export interface Task {
   note?: string;
   remindBefore?: number; // saatli görevden kaç dk önce Telegram'dan haber (boş = yok)
   ruleId?: string;       // tekrarlayan görev kuralından üretildiyse
+  effort?: 'light' | 'deep'; // "Şimdi ne yapsam" için isteğe bağlı
   done: boolean;
   order: number;
   createdAt: number;
@@ -147,6 +148,7 @@ export interface Course {
   status: CourseStatus;
   credits?: number;
   note?: string;
+  passedAt?: string;
   order: number;
   createdAt: number;
 }
@@ -197,6 +199,71 @@ export interface LibraryItem {
   updatedAt?: number;
 }
 
+/* ── Hayat defteri ────────────────────────────────────── */
+
+export interface JournalEntry {
+  id: string;
+  date: string;          // mantıksal gün
+  time?: string;         // "21:40"
+  title?: string;
+  text: string;
+  mood?: number;         // 1–5
+  tags?: string[];       // #saha → "saha"
+  people?: string[];     // @Ali → kişi kimlikleri
+  photo?: string;        // küçültülmüş JPEG (data URL, ~150 KB)
+  important?: boolean;   // ⭐ hayat çizelgesine düşer
+  prompt?: string;       // yazarken görünen günün sorusu
+  source?: 'app' | 'telegram';
+  createdAt: number;
+  updatedAt?: number;
+}
+
+export type Relation = 'family' | 'friend' | 'work' | 'school' | 'other';
+export interface Contact { date: string; kind: 'talk' | 'meet'; note?: string }
+export interface Person {
+  id: string;
+  name: string;
+  relation: Relation;
+  birthday?: string;     // "MM-DD" ya da "YYYY-MM-DD"
+  notes?: string;        // hediye fikirleri, sevdiği şeyler
+  everyDays?: number;    // "şu kadar günde bir hatırlat" (boş = hatırlatma yok)
+  lastContact?: string;
+  contacts?: Contact[];
+  createdAt: number;
+}
+
+export type DreamStatus = 'dream' | 'doing' | 'done';
+export interface Dream {
+  id: string;
+  title: string;
+  note?: string;
+  area?: 'travel' | 'learn' | 'do' | 'have' | 'be';
+  status: DreamStatus;
+  doneAt?: string;
+  createdAt: number;
+}
+
+export interface GoalStep { id: string; text: string; done: boolean; taskId?: string }
+export interface YearGoal {
+  id: string;
+  year: number;
+  title: string;
+  why?: string;
+  steps?: GoalStep[];
+  trackerId?: string;    // bağlı rutin / azaltılan alışkanlık
+  done?: boolean;
+  createdAt: number;
+}
+
+export interface Moment {
+  id: string;
+  date: string;
+  title: string;
+  note?: string;
+  emoji?: string;
+  createdAt: number;
+}
+
 export type InboxStatus = 'open' | 'planned' | 'archived';
 
 export interface InboxItem {
@@ -218,11 +285,13 @@ export interface Settings {
   showStreak: boolean;    // zincir göstergesi — varsayılan kapalı
   migratedV2?: boolean;
   displayName?: string;   // selamda ve Telegram'da kullanılan ad
+  haptics?: boolean;      // tik atınca titreşim (varsayılan açık)
+  location?: { name: string; lat: number; lon: number } | null; // güneş kartı için
   focusUntil?: string;    // odak modu bu güne kadar (dahil) açık
   quietStart?: string;    // sessiz saatler (Telegram), ör. "00:30"
   quietEnd?: string;      // ör. "07:00"
   pauseDate?: string;     // "bugün bana dokunma" — bu gün hiç anımsatma
-  planning?: { morning?: string; evening?: string; sunday?: string; letter?: boolean; money?: boolean }; // planlama anımsatıcı saatleri ("" = kapalı)
+  planning?: { morning?: string; evening?: string; sunday?: string; letter?: boolean; money?: boolean; people?: boolean }; // planlama anımsatıcı saatleri ("" = kapalı)
   telegramChatId?: number;
   telegramLinkCode?: string;
   telegramTest?: number;  // "deneme mesajı gönder" isteği (zaman damgası)

@@ -8,6 +8,7 @@ import { useStore } from '../store/useStore';
 import { useTimer } from '../store/useTimer';
 import { run } from '../store/useUI';
 import { fmtMinutes } from '../utils/date';
+import { haptic } from '../utils/haptic';
 
 /** Satırın altındaki durum metni — bilgi verir, yargılamaz */
 function trackerSubtitle(v: TrackerView, day?: { sleep?: { bed: string; wake: string } }): string {
@@ -50,7 +51,7 @@ export default function TrackerRow({ v, date, showTime = true }: { v: TrackerVie
     control = (
       <button
         key={pop}
-        onClick={() => { setPop((p) => p + 1); run(() => setEntry(t.id, done ? 0 : 1, date)); }}
+        onClick={() => { setPop((p) => p + 1); if (!done) haptic(); run(() => setEntry(t.id, done ? 0 : 1, date)); }}
         className={`check-btn ${done ? 'done animate-pop' : ''}`}
         aria-label={done ? `${t.name}: yapıldı, geri al` : `${t.name}: yaptım`}
         aria-pressed={done}
@@ -61,7 +62,7 @@ export default function TrackerRow({ v, date, showTime = true }: { v: TrackerVie
   } else if (t.type === 'counter') {
     control = (
       <button
-        onClick={() => run(() => bumpEntry(t.id, t.step ?? 1, date))}
+        onClick={() => { haptic(8); run(() => bumpEntry(t.id, t.step ?? 1, date)); }}
         className="step-btn tinted gap-1"
         aria-label={`${t.name}: ${t.step ?? 1} ${t.unit ?? ''} ekle`}
       >

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Settings, Task, Tracker } from '../src/types';
-import { doneValue, inWindow, isQuiet, istanbulClock, parseAction, planUserMessages, type UserInput } from './core';
+import { doneValue, inWindow, isQuiet, istanbulClock, parseAction, parseIncoming, planUserMessages, type UserInput } from './core';
 
 const S = (p: Partial<Settings> = {}): Settings => ({ onboarded: true, dayStartHour: 4, theme: 'dark', startDate: '2026-10-01', showStreak: false, ...p });
 const tr = (p: Partial<Tracker>): Tracker => ({ id: 'dis', name: 'Diş fırçala', icon: 'brush', category: 'order', type: 'check', order: 0, active: true, reminders: [{ time: '07:15', on: true }], ...p });
@@ -77,5 +77,37 @@ describe('düğmeler', () => {
     expect(doneValue(tr({}), 0)).toBe(1);
     expect(doneValue(tr({ type: 'counter', step: 250 }), 500)).toBe(750);
     expect(doneValue(tr({ type: 'duration', doneAt: 10 }), 3)).toBe(10);
+  });
+});
+
+describe('gelen mesajlar', () => {
+  it('/g günlüğe, düz metin Aklımdakiler\'e', () => {
+    expect(parseIncoming('/g Bugün sahada arızayı çözdük')).toEqual({ kind: 'journal', text: 'Bugün sahada arızayı çözdük' });
+    expect(parseIncoming('/günlük güzel gün')).toEqual({ kind: 'journal', text: 'güzel gün' });
+    expect(parseIncoming('/g@MeLifeBot not')).toEqual({ kind: 'journal', text: 'not' });
+    expect(parseIncoming('inverter garantisini bul')).toEqual({ kind: 'inbox', text: 'inverter garantisini bul' });
+    expect(parseIncoming('/g')).toEqual({ kind: 'help' });
+    expect(parseIncoming('/bilinmeyen')).toBeNull();
+  });
+  it('kişi düğmesi ayrışır', () => {
+    expect(parseAction('p|abc|2026-10-14')).toEqual({ kind: 'contact', personId: 'abc', date: '2026-10-14' });
+  });
+});
+
+describe('insan hatırlatmaları', () => {
+  const at1030 = { clock: istanbulClock(new Date('2026-10-14T07:31:00Z')), fromMin: 10 * 60 + 25 };
+  const person = (p: object) => ({ id: 'ali', name: 'Ali Yılmaz', relation: 'friend' as const, createdAt: 0, ...p });
+  it('doğum günü 3 gün önce ve günü', () => {
+    const before = planUserMessages(base({ ...at1030, people: [person({ birthday: '1990-10-17' })] }));
+    expect(before.map((m) => m.key)).toContain('bd3_ali_2026-10-17');
+    const on = planUserMessages(base({ ...at1030, people: [person({ birthday: '1990-10-14' })] }));
+    expect(on[0].text).toContain('Bugün');
+  });
+  it('sıklık dolunca haftada bir sorar; kapatılabilir', () => {
+    const p = person({ everyDays: 14, lastContact: '2026-09-20' });
+    const m = planUserMessages(base({ ...at1030, people: [p] }));
+    expect(m.some((x) => x.key.startsWith('pc_ali_'))).toBe(true);
+    const off = planUserMessages(base({ ...at1030, settings: S({ planning: { people: false } }), people: [p] }));
+    expect(off.some((x) => x.key.startsWith('pc_'))).toBe(false);
   });
 });

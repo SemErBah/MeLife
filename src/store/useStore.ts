@@ -6,10 +6,10 @@ import { fromTemplate, type Template } from '../services/seed';
 import { pendingInstances } from '../utils/recurring';
 import { useFinance } from '../finance/store/useFinance';
 import { logicalToday, sleepMinutes } from '../utils/date';
-import type { AppUser, Course, DayLog, Exam, InboxItem, InboxStatus, LibraryItem, Settings, StudySession, TabId, Task, TaskRule, Theme, Tracker, WeekLog } from '../types';
+import type { AppUser, Course, DayLog, Dream, Exam, InboxItem, InboxStatus, JournalEntry, LibraryItem, Moment, Person, Settings, StudySession, TabId, Task, TaskRule, Theme, Tracker, WeekLog, YearGoal } from '../types';
 
-export type MoreView = 'routines' | 'library' | 'courses' | 'calendar' | 'stats' | 'reminders' | 'settings';
-export type ItemCol = 'taskRules' | 'courses' | 'exams' | 'sessions' | 'library';
+export type MoreView = 'routines' | 'people' | 'dreams' | 'timeline' | 'library' | 'courses' | 'calendar' | 'stats' | 'reminders' | 'settings';
+export type ItemCol = 'taskRules' | 'courses' | 'exams' | 'sessions' | 'library' | 'journal' | 'people' | 'dreams' | 'yearGoals' | 'moments';
 
 /* ── Tema ─────────────────────────────────────────────── */
 
@@ -54,6 +54,11 @@ interface AppState {
   exams: Exam[];
   sessions: StudySession[];
   library: LibraryItem[];
+  journal: JournalEntry[];
+  people: Person[];
+  dreams: Dream[];
+  yearGoals: YearGoal[];
+  moments: Moment[];
   tasks: Task[];
   inbox: InboxItem[];
 
@@ -139,7 +144,7 @@ export const useStore = create<AppState>((set, get) => {
   function attach(user: AppUser, b: Backend) {
     dataSubs.forEach((u) => u());
     backend = b;
-    let pending = 11;
+    let pending = 16;
     let rawPhase: number | undefined;
     const ready = () => {
       if (--pending === 0) {
@@ -166,6 +171,11 @@ export const useStore = create<AppState>((set, get) => {
       b.watchCol<Exam>('exams', once((items) => set({ exams: items.sort((a, c) => a.date.localeCompare(c.date) || (a.time ?? '').localeCompare(c.time ?? '')) }))),
       b.watchCol<StudySession>('sessions', once((sessions) => set({ sessions }))),
       b.watchCol<LibraryItem>('library', once((items) => set({ library: items.sort((a, c) => (c.updatedAt ?? c.createdAt) - (a.updatedAt ?? a.createdAt)) }))),
+      b.watchCol<JournalEntry>('journal', once((items) => set({ journal: items.sort((a, c) => c.date.localeCompare(a.date) || (c.time ?? '').localeCompare(a.time ?? '') || c.createdAt - a.createdAt) }))),
+      b.watchCol<Person>('people', once((items) => set({ people: items.sort((a, c) => a.name.localeCompare(c.name, 'tr')) }))),
+      b.watchCol<Dream>('dreams', once((dreams) => set({ dreams: dreams.sort((a, c) => a.createdAt - c.createdAt) }))),
+      b.watchCol<YearGoal>('yearGoals', once((yearGoals) => set({ yearGoals: yearGoals.sort((a, c) => a.createdAt - c.createdAt) }))),
+      b.watchCol<Moment>('moments', once((moments) => set({ moments }))),
       b.watchCol<InboxItem>('inbox', once((items) => set({ inbox: items.sort((a, c) => c.createdAt - a.createdAt) }))),
     ];
   }
@@ -174,7 +184,7 @@ export const useStore = create<AppState>((set, get) => {
     dataSubs.forEach((u) => u());
     dataSubs = [];
     backend = null;
-    set({ user: null, dataReady: false, trackers: [], days: {}, weeks: {}, rules: [], courses: [], exams: [], sessions: [], library: [], tasks: [], inbox: [], settings: defaultSettings() });
+    set({ user: null, dataReady: false, trackers: [], days: {}, weeks: {}, rules: [], courses: [], exams: [], sessions: [], library: [], journal: [], people: [], dreams: [], yearGoals: [], moments: [], tasks: [], inbox: [], settings: defaultSettings() });
   }
 
   return {
@@ -195,6 +205,11 @@ export const useStore = create<AppState>((set, get) => {
     exams: [],
     sessions: [],
     library: [],
+    journal: [],
+    people: [],
+    dreams: [],
+    yearGoals: [],
+    moments: [],
     tasks: [],
     inbox: [],
 

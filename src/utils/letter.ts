@@ -15,6 +15,7 @@ export interface LetterInput {
   topCategory?: string;
   intentionsDone?: number;
   intentionsTotal?: number;
+  insight?: string;
 }
 
 const tl = (n: number) => `${Math.round(n).toLocaleString('tr-TR')} ₺`;
@@ -40,6 +41,7 @@ export function weeklyLetter(x: LetterInput): string {
   if (x.spent) facts.push(`${tl(x.spent)} harcadın${x.topCategory ? `, en çok ${x.topCategory}` : ''}.`);
 
   if (facts.length) lines.push('', ...facts);
+  if (x.insight) lines.push('', `Bir keşif: ${x.insight}`);
   else lines.push('', 'Bu hafta pek kayıt yok. Olur böyle haftalar; hiçbir şey kaybolmadı.');
 
   lines.push('', 'Yeni haftaya küçük bir şeyle başla. Bir şey yeter.');

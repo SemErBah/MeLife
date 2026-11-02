@@ -1,10 +1,12 @@
 /* Anımsatıcı çekirdeği — Firebase ve Telegram'dan bağımsız, saf fonksiyonlar.
    Uygulamanın kendi kurallarını kullanır: rutin yapıldıysa sorma, fatura/maaş soruları, mektup. */
 
-import type { DayLog, Settings, Task, Tracker } from '../src/types';
+import type { DayLog, Person, Settings, Task, Tracker } from '../src/types';
 import type { Cashflow, Transaction } from '../src/finance/types';
 import { isDone, isScheduled } from '../src/utils/trackers';
 import { dueBills, shouldAskSalary } from '../src/finance/utils/period';
+import { contactDue, nextBirthday, sinceLabel } from '../src/utils/people';
+import { isoWeekKey } from '../src/utils/date';
 
 export const TZ = 'Europe/Istanbul';
 
@@ -66,6 +68,7 @@ export interface UserInput {
   salaryDayHint?: number; // Para ayarlarından
   appUrl: string;
   letter?: string;       // Pazar mektubu (hazırsa)
+  people?: Person[];
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -151,8 +154,49 @@ export function planUserMessages(x: UserInput): Outgoing[] {
     }
   }
 
+  // 6) İnsanlar (10:30): doğum günü 3 gün önce ve günü; uzun süredir konuşulmayanlara haftada en fazla bir soru
+  if (p.people !== false && x.people?.length && inWindow(10 * 60 + 30, x.fromMin, c.minutes)) {
+    for (const person of x.people) {
+      const b = nextBirthday(person.birthday, c.date);
+      const first = esc(person.name.split(' ')[0]);
+      if (b && b.inDays === 3) out.push({ key: `bd3_${person.id}_${b.date}`, text: `🎂 ${esc(person.name)} 3 gün sonra doğum günü${b.age ? ` (${b.age} yaşına giriyor)` : ''}. Hediye fikri var mı?` });
+      if (b && b.inDays === 0) out.push({ key: `bd0_${person.id}_${b.date}`, text: `🎂 Bugün ${esc(person.name)} doğum günü! Bir mesaj atmak ister misin?`, buttons: [[{ text: 'Aradım / yazdım ✓', data: `p|${person.id}|${c.date}` }]] });
+      const since = contactDue(person, c.date);
+      if (since !== null && !(b && b.inDays <= 3)) {
+        out.push({ key: `pc_${person.id}_${isoWeekKey(c.date)}`, text: `${first} ile en son ${sinceLabel(since)} konuştun. Bugün arasan mı? 💬`, buttons: [[{ text: 'Konuştuk ✓', data: `p|${person.id}|${c.date}` }]] });
+      }
+    }
+  }
+
   return out;
 }
+
+/* ── Gelen mesajlar ────────────────────────────────────── */
+
+export type Incoming = { kind: 'journal'; text: string } | { kind: 'inbox'; text: string } | { kind: 'help' };
+
+/** "/g metin" → günlük; düz metin → Aklımdakiler; /yardim → yardım. Diğer komutlar yok sayılır. */
+export function parseIncoming(raw: string): Incoming | null {
+  const text = raw.trim();
+  if (!text) return null;
+  const cmd = text.match(/^\/([\p{L}_]+)(?:@\w+)?(?:\s+([\s\S]*))?$/u);
+  if (cmd) {
+    const [, name, rest = ''] = cmd;
+    const n = name.toLocaleLowerCase('tr-TR');
+    if (n === 'g' || n === 'gunluk' || n === 'günlük') return rest.trim() ? { kind: 'journal', text: rest.trim() } : { kind: 'help' };
+    if (n === 'yardim' || n === 'help') return { kind: 'help' };
+    return null;
+  }
+  return { kind: 'inbox', text: text.slice(0, 500) };
+}
+
+export const HELP = [
+  'Bana yazabileceklerin:',
+  "• Düz bir mesaj → <b>Aklımdakiler</b>'e eklenir",
+  '• <b>/g</b> metin → <b>günlüğüne</b> yazılır (ör. /g Bugün sahada arızayı çözdük #saha)',
+  '',
+  'Anımsatıcıların düğmeleriyle de kayıt yapabilirsin.',
+].join('\n');
 
 /* ── Düğme yanıtları ───────────────────────────────────── */
 
@@ -160,7 +204,8 @@ export type Action =
   | { kind: 'done'; trackerId: string; date: string }
   | { kind: 'later'; trackerId: string; date: string }
   | { kind: 'skip'; trackerId: string; date: string }
-  | { kind: 'task'; taskId: string };
+  | { kind: 'task'; taskId: string }
+  | { kind: 'contact'; personId: string; date: string };
 
 export function parseAction(data: string): Action | null {
   const [k, a, b] = data.split('|');
@@ -168,6 +213,7 @@ export function parseAction(data: string): Action | null {
   if (k === 'l' && a && b) return { kind: 'later', trackerId: a, date: b };
   if (k === 's' && a && b) return { kind: 'skip', trackerId: a, date: b };
   if (k === 't' && a) return { kind: 'task', taskId: a };
+  if (k === 'p' && a && b) return { kind: 'contact', personId: a, date: b };
   return null;
 }
 
@@ -183,4 +229,5 @@ export const ACK: Record<Action['kind'], string> = {
   later: '⏰ 15 dk sonra tekrar soracağım',
   skip: '👌 Bugün geçildi',
   task: '✓ Görev tamamlandı',
+  contact: '💛 Kaydedildi',
 };

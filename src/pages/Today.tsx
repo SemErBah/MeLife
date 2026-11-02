@@ -1,9 +1,16 @@
 import { motion } from 'framer-motion';
-import { Check, ChevronLeft, ChevronRight, Flame, Footprints, GraduationCap, ListTodo, Moon, MoonStar, NotebookPen, Plus, Repeat, Target, TrendingDown, X } from 'lucide-react';
+import { BookHeart, Check, ChevronLeft, ChevronRight, Flame, Footprints, GraduationCap, ListTodo, Moon, MoonStar, Plus, Repeat, Target, TrendingDown, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { SCALE_FACES } from '../constants';
 import ProfileButton from '../components/ProfileButton';
+import { JournalEditor } from '../components/Journal';
+import Modal from '../components/Modal';
+import { MemoriesCard } from './Notebook';
+import { memoriesFor } from '../utils/journal';
+import { promptFor } from '../utils/prompts';
 import TaskList from '../components/TaskList';
+import SunCard from '../components/SunCard';
+import { MilestoneCard, PeopleNudges } from '../components/LifeNudges';
 import { PICK } from '../components/StartSmall';
 import TrackerRow from '../components/TrackerRow';
 import { ReduceCard } from '../components/Reduce';
@@ -11,9 +18,9 @@ import { useDay, useDoneCtx, type TrackerView } from '../hooks/useDay';
 import { useSheets } from '../store/useSheets';
 import { useStore } from '../store/useStore';
 import { run } from '../store/useUI';
-import { addDays, dayMonth, daysBetween, fmtMinutes, greeting, nowToMin, sleepMinutes, timeToMin, weekdayName } from '../utils/date';
+import { addDays, dayMonth, daysBetween, fmtMinutes, greeting, longDate, nowToMin, sleepMinutes, timeToMin, weekdayName } from '../utils/date';
 import { byTime, streak } from '../utils/trackers';
-import type { Tracker } from '../types';
+import type { JournalEntry, Tracker } from '../types';
 
 type Slot = 'morning' | 'noon' | 'evening' | 'night' | 'any';
 const SLOTS: { id: Slot; label: string }[] = [
@@ -74,9 +81,12 @@ function DayView({ date, today, onDate }: { date: string; today: string; onDate:
     : isToday ? 'Yavaştan başla. Bir şey yeter.' : 'Bu gün için kayıt yok.';
 
   return (
-    <div className="page max-w-3xl">
+    <div className="page max-w-3xl lg:max-w-6xl relative">
+      {/* Günün saatine göre başlık ışığı (şafak / öğlen / akşam / gece) */}
+      {isToday && <div className="ambient" data-tod={timeOfDay(now)} aria-hidden="true" />}
+
       {/* Başlık: gün adı büyük, tarih ve selam küçük */}
-      <header className="space-y-3">
+      <header className="space-y-3 relative">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm text-text-muted">
             {isToday ? `${greeting(now)}${firstName ? `, ${firstName}` : ''}` : rel ?? ''}
@@ -98,7 +108,10 @@ function DayView({ date, today, onDate }: { date: string; today: string; onDate:
       </header>
 
       {/* Yaklaşan sınavlar (14 gün) ve odak modu önerisi */}
+      {isToday && <SunCard />}
       {isToday && <ExamStrip today={today} />}
+      {isToday && <PeopleNudges today={today} />}
+      {isToday && <MilestoneCard today={today} />}
       {focus && (
         <p className="text-xs text-text-muted -mt-3 flex items-center gap-1.5"><Target size={13} /> Odak modundasın · yalnızca seçtiğin rutinler görünüyor</p>
       )}
@@ -109,11 +122,14 @@ function DayView({ date, today, onDate }: { date: string; today: string; onDate:
       {/* Akşam: günü kapatalım mı? */}
       {isToday && !day?.closedAt && nowMin >= timeToMin('20:00') && <CloseDayNudge date={date} />}
 
+      {/* Geniş ekranda iki sütun: solda plan, sağda rutinler */}
+      <div className="grid lg:grid-cols-2 gap-[1.75rem] items-start">
+      <div className="space-y-[1.75rem] min-w-0">
       {/* Plan */}
       <section className="widget">
         <div className="widget-header">
           <h3><ListTodo size={18} className="text-accent" /> {rel ? PLAN_TITLES[rel] : 'Plan'}</h3>
-          {isToday && <button className="widget-link" onClick={() => openStart(PICK)}><Footprints size={13} className="inline -mt-0.5" /> Başlayamıyorum</button>}
+          {isToday && <button className="widget-link" onClick={() => openStart(PICK)}><Footprints size={13} className="inline -mt-0.5" /> Şimdi ne yapsam?</button>}
         </div>
         <div className="px-2 pb-3 sm:px-3">
           <TaskList date={date} placeholder={date > today ? 'Bu güne bir şey ekle…' : 'Görev ekle…'} />
@@ -130,11 +146,14 @@ function DayView({ date, today, onDate }: { date: string; today: string; onDate:
         </section>
       )}
 
+      </div>
+
+      <div className="space-y-[1.75rem] min-w-0">
       {/* Rutinler */}
       <Routines items={buildItems} date={date} onAdd={() => openRoutine(null)} />
 
       {/* Gün notu */}
-      {date <= today && <DayNote date={date} initial={day?.note ?? ''} />}
+      {date <= today && <JournalToday date={date} legacyNote={day?.note} />}
 
       {/* Günü kapat — istediğin an */}
       {date <= today && (
@@ -142,8 +161,19 @@ function DayView({ date, today, onDate }: { date: string; today: string; onDate:
           {day?.closedAt ? <><Check size={16} className="text-accent" /> Gün kapatıldı · tekrar bak</> : <><MoonStar size={16} /> Günü kapat</>}
         </button>
       )}
+      </div>
+      </div>
     </div>
   );
+}
+
+/** Günün saati → başlık ışığının tonu */
+function timeOfDay(now: Date): 'dawn' | 'day' | 'evening' | 'night' {
+  const h = now.getHours();
+  if (h >= 5 && h < 10) return 'dawn';
+  if (h >= 10 && h < 17) return 'day';
+  if (h >= 17 && h < 21) return 'evening';
+  return 'night';
 }
 
 /* ── Rutinler ─────────────────────────────────────────── */
@@ -299,24 +329,45 @@ function useDismiss(key: string): [boolean, () => void] {
 
 /* ── Gün notu ─────────────────────────────────────────── */
 
-function DayNote({ date, initial }: { date: string; initial: string }) {
-  const setDayNote = useStore((s) => s.setDayNote);
-  const [text, setText] = useState(initial);
-  const [seen, setSeen] = useState(initial);
-  if (seen !== initial) { setSeen(initial); setText(initial); }
+function JournalToday({ date, legacyNote }: { date: string; legacyNote?: string }) {
+  const entries = useStore((s) => s.journal).filter((e) => e.date === date);
+  const journal = useStore((s) => s.journal);
+  const today = useStore((s) => s.today());
+  const setTab = useStore((s) => s.setTab);
+  const [writing, setWriting] = useState(false);
+  const [open, setOpen] = useState<JournalEntry | null>(null);
+  const memories = date === today ? memoriesFor(journal, today) : [];
 
   return (
-    <section className="widget">
-      <div className="widget-header"><h3><NotebookPen size={18} className="text-text-muted" /> Gün notu</h3></div>
-      <div className="widget-body pt-0">
-        <textarea
-          className="input min-h-[80px] resize-none"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={() => { if (text !== initial) run(() => setDayNote(text.trim(), date)); }}
-          placeholder="İstersen bir satır: bugün nasıldı?"
-        />
-      </div>
-    </section>
+    <>
+      <section className="widget">
+        <div className="widget-header">
+          <h3><BookHeart size={18} className="text-text-muted" /> Günlük</h3>
+          {entries.length > 0 && <button className="widget-link" onClick={() => setTab('notes')}>Defter <ChevronRight size={13} className="inline -mt-0.5" /></button>}
+        </div>
+        <div className="widget-body pt-0 space-y-3">
+          {legacyNote && <p className="journal-text text-[15px] text-text-muted">{legacyNote}</p>}
+          {entries.map((e) => (
+            <button key={e.id} onClick={() => setOpen(e)} className="block w-full text-left min-h-0">
+              <span className="text-[11px] text-text-muted num">{e.time}</span>
+              {e.title && <span className="block font-semibold">{e.title}</span>}
+              <span className="journal-text text-[15px] line-clamp-3">{e.text}</span>
+            </button>
+          ))}
+          <button onClick={() => setWriting(true)} className="w-full text-left rounded-2xl bg-surface-el px-4 py-3 min-h-0 hover:bg-surface-hover transition-colors">
+            <span className="font-display text-[16px] leading-snug block">{promptFor(date)}</span>
+            <span className="text-xs text-text-muted">{entries.length ? 'Bir şey daha yaz…' : 'Bir satır bile yeter'}</span>
+          </button>
+        </div>
+      </section>
+      {memories.length > 0 && <MemoriesCard memories={memories} onOpen={setOpen} />}
+
+      <Modal isOpen={writing} onClose={() => setWriting(false)} title="Günlük">
+        {writing && <JournalEditor date={date} autoFocus onDone={() => setWriting(false)} />}
+      </Modal>
+      <Modal isOpen={!!open} onClose={() => setOpen(null)} title={open ? longDate(open.date) : ''}>
+        {open && <JournalEditor key={open.id} entry={journal.find((x) => x.id === open.id) ?? open} onDone={() => setOpen(null)} />}
+      </Modal>
+    </>
   );
 }

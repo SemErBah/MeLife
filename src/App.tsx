@@ -15,7 +15,7 @@ import TrackerSheet from './components/TrackerSheet';
 import UIHost from './components/UIHost';
 import Auth from './pages/Auth';
 import More from './pages/More';
-import Notes from './pages/Notes';
+import Notebook from './pages/Notebook';
 import Onboarding from './pages/Onboarding';
 import Today from './pages/Today';
 import Week from './pages/Week';
@@ -87,7 +87,7 @@ export default function App() {
   const pages: Record<string, React.ReactNode> = {
     today: <Today />,
     week: <Week />,
-    notes: <Notes />,
+    notes: <Notebook />,
     money: <Money />,
     more: <More />,
   };

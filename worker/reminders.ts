@@ -5,9 +5,10 @@
 
 import { cert, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore, type DocumentReference, type Firestore } from 'firebase-admin/firestore';
-import type { DayLog, Settings, Task, Tracker } from '../src/types';
+import type { Contact, DayLog, Person, Settings, Task, Tracker } from '../src/types';
 import type { Cashflow, Transaction, UserConfig } from '../src/finance/types';
-import { ACK, doneValue, istanbulClock, parseAction, planUserMessages, type Clock } from './core';
+import { ACK, doneValue, HELP, istanbulClock, parseAction, parseIncoming, planUserMessages, type Clock } from './core';
+import { extractPeople, extractTags } from '../src/utils/journal';
 import { answer, editText, getUpdates, send, type Update } from './telegram';
 import { weekSummary } from '../src/utils/review';
 import { weeklyLetter } from '../src/utils/letter';
@@ -39,7 +40,7 @@ const list = async <T,>(ref: DocumentReference, col: string) =>
 
 /* ── 1) Gelen güncellemeler ────────────────────────────── */
 
-async function handleUpdates(users: UserRef[], offset: number): Promise<number> {
+async function handleUpdates(users: UserRef[], offset: number, clock: Clock): Promise<number> {
   let updates: Update[] = [];
   try { updates = await getUpdates(offset); } catch (e) { console.error(e); return offset; }
   const byChat = (chatId: number) => users.find((u) => u.settings.telegramChatId === chatId);
@@ -59,6 +60,27 @@ async function handleUpdates(users: UserRef[], offset: number): Promise<number> 
           await send(msg.chat.id, `Bağlandı ✓ ${name ? `Merhaba ${name}! ` : ''}Anımsatıcıların artık buradan gelecek. Hepsi isteğe bağlı; istediğin zaman susturabilirsin.`);
         } else {
           await send(msg.chat.id, 'Merhaba! Bağlanmak için MeLife → Daha → Anımsatıcılar → "Telegram\'a bağlan" ile aldığın kodu gönder: <b>/start KOD</b>');
+        }
+        continue;
+      }
+
+      // Serbest mesaj → Aklımdakiler, /g → günlük
+      if (msg?.text) {
+        const user = byChat(msg.chat.id);
+        const inc = parseIncoming(msg.text);
+        if (!user || !inc) continue;
+        if (inc.kind === 'help') { await send(msg.chat.id, HELP); continue; }
+        if (inc.kind === 'inbox') {
+          await user.ref.collection('inbox').add({ text: inc.text, status: 'open', createdAt: Date.now() });
+          await send(msg.chat.id, "💡 Aklımdakiler'e eklendi");
+        } else {
+          const people = await list<Person>(user.ref, 'people');
+          const hm = `${String(Math.floor(clock.minutes / 60) % 24).padStart(2, '0')}:${String(clock.minutes % 60).padStart(2, '0')}`;
+          await user.ref.collection('journal').add({
+            date: clock.date, time: hm, text: inc.text, tags: extractTags(inc.text), people: extractPeople(inc.text, people),
+            source: 'telegram', createdAt: Date.now(),
+          });
+          await send(msg.chat.id, '📓 Günlüğüne yazıldı');
         }
         continue;
       }
@@ -84,6 +106,13 @@ async function handleUpdates(users: UserRef[], offset: number): Promise<number> 
           await user.ref.collection('sent').doc(`skip_${action.trackerId}_${action.date}`).set({ at: Date.now() });
         } else if (action.kind === 'task') {
           await user.ref.collection('tasks').doc(action.taskId).set({ done: true }, { merge: true });
+        } else if (action.kind === 'contact') {
+          const pRef = user.ref.collection('people').doc(action.personId);
+          const person = (await pRef.get()).data() as Person | undefined;
+          if (person) {
+            const contacts: Contact[] = [{ date: action.date, kind: 'talk' as const }, ...(person.contacts ?? [])].slice(0, 60);
+            await pRef.set({ lastContact: action.date, contacts }, { merge: true });
+          }
         }
         await answer(cq.id, ACK[action.kind]);
         await editText(cq.message.chat.id, cq.message.message_id, `${cq.message.text ?? ''}\n\n<i>${ACK[action.kind]}</i>`);
@@ -123,12 +152,13 @@ async function buildLetter(user: UserRef, trackers: Tracker[], tasks: Task[], tr
 async function runUser(user: UserRef, clock: Clock, fromMin: number) {
   const chatId = user.settings.telegramChatId;
   if (!chatId) return 0;
-  const [trackers, tasks, snoozes, daySnap, sentSnap] = await Promise.all([
+  const [trackers, tasks, snoozes, daySnap, sentSnap, people] = await Promise.all([
     list<Tracker>(user.ref, 'trackers'),
     list<Task>(user.ref, 'tasks').then((ts) => ts.filter((t) => t.forDate === clock.date)),
     list<{ id: string; trackerId?: string; fireAt: number }>(user.ref, 'snoozes'),
     user.ref.collection('days').doc(clock.date).get(),
     user.ref.collection('sent').where('at', '>', Date.now() - 2 * 86_400_000).get(),
+    list<Person>(user.ref, 'people'),
   ]);
   const skipped = sentSnap.docs.map((d) => d.id).filter((id) => id.startsWith('skip_') && id.endsWith(clock.date)).map((id) => id.slice(5, -clock.date.length - 1));
   const cashflows = (await db.collection('cashflows').where('userId', '==', user.uid).get()).docs.map((d) => ({ id: d.id, ...d.data() }) as Cashflow);
@@ -139,7 +169,7 @@ async function runUser(user: UserRef, clock: Clock, fromMin: number) {
 
   const messages = planUserMessages({
     settings: user.settings, trackers, day: daySnap.exists ? ({ id: daySnap.id, ...daySnap.data() } as DayLog) : undefined,
-    tasks, cashflows, transactions, snoozes, clock, fromMin, appUrl: APP_URL, skipped, salaryDayHint: finCfg?.salaryDayHint, letter,
+    tasks, cashflows, transactions, snoozes, clock, fromMin, appUrl: APP_URL, skipped, salaryDayHint: finCfg?.salaryDayHint, letter, people,
   });
 
   let sent = 0;
@@ -163,7 +193,7 @@ async function main() {
   const fromMin = istanbulClock(new Date(last)).minutes;
 
   const users = await loadUsers();
-  const offset = await handleUpdates(users, state?.offset ?? 0);
+  const offset = await handleUpdates(users, state?.offset ?? 0, clock);
 
   let total = 0;
   for (const u of users) {

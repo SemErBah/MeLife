@@ -5,12 +5,14 @@ import { useStore } from '../store/useStore';
 import { addDays } from '../utils/date';
 import { weeklyLetter } from '../utils/letter';
 import { weekSummary } from '../utils/review';
+import { findInsights } from '../utils/insights';
+import { rangeDates } from '../utils/stats';
 import { doneCount } from '../utils/trackers';
 import { useDoneCtx } from './useDay';
 
 /** Bir haftanın mektubu (Hafta ekranı ve Telegram aynı metni kullanır) */
 export function useWeeklyLetter(weekOf: string): string {
-  const { trackers, days, tasks, weeks, sessions, settings, user } = useStore();
+  const { trackers, days, tasks, weeks, sessions, settings, user, journal } = useStore();
   const today = useStore((s) => s.today());
   const { transactions } = useFinance();
   const ctx = useDoneCtx();
@@ -38,6 +40,7 @@ export function useWeeklyLetter(weekOf: string): string {
       topCategory: Object.entries(byCat).sort((a, b) => b[1] - a[1])[0]?.[0],
       intentionsTotal: week?.intentions?.length,
       intentionsDone: week?.intentions?.filter((i) => i.done).length,
+      insight: findInsights(trackers, days, journal, rangeDates(end < today ? end : today, 60))[0]?.text,
     });
-  }, [weekOf, trackers, days, tasks, weeks, sessions, settings.displayName, user, today, transactions, ctx]);
+  }, [weekOf, trackers, days, tasks, weeks, sessions, settings.displayName, user, today, transactions, ctx, journal]);
 }

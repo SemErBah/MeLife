@@ -259,3 +259,139 @@ describe('haftalık mektup', () => {
     expect(weeklyLetter({ doneTasks: 0, routines: [] })).toContain('Olur böyle haftalar');
   });
 });
+
+import { promptFor, PROMPTS } from './prompts';
+import { extractPeople, extractTags, memoriesFor, monthsAgo } from './journal';
+import { dataUrlBytes, fitSize } from './image';
+
+describe('günlük', () => {
+  it('günün sorusu güne göre sabit, değiştirilebilir', () => {
+    expect(PROMPTS.length).toBeGreaterThanOrEqual(60);
+    expect(promptFor('2026-11-02')).toBe(promptFor('2026-11-02'));
+    expect(promptFor('2026-11-02', 1)).not.toBe(promptFor('2026-11-02'));
+  });
+  it('etiket ve kişi ayıklama (Türkçe)', () => {
+    expect(extractTags('Bugün #Saha işi uzadı #okul #saha')).toEqual(['saha', 'okul']);
+    const people = [{ id: 'a', name: 'Ali Yılmaz' }, { id: 'b', name: 'İlknur' }];
+    expect(extractPeople('@Ali ile ve @ilknur ile konuştuk, @Veli yok', people)).toEqual(['a', 'b']);
+  });
+  it('bu günün hatıraları', () => {
+    expect(monthsAgo('2026-03-31', 1)).toBeNull();          // 31 Şubat yok
+    expect(monthsAgo('2026-11-02', 12)).toBe('2025-11-02');
+    const e = (date: string) => ({ id: date, date, text: 'x', createdAt: 0 });
+    const m = memoriesFor([e('2025-11-02'), e('2026-10-02'), e('2026-10-30')], '2026-11-02');
+    expect(m.map((x) => x.label)).toEqual(['1 ay önce', '1 yıl önce']);
+  });
+  it('fotoğraf boyutu', () => {
+    expect(fitSize(4000, 3000)).toEqual({ w: 1280, h: 960 });
+    expect(fitSize(800, 600)).toEqual({ w: 800, h: 600 });
+    expect(dataUrlBytes('data:image/jpeg;base64,' + 'A'.repeat(400))).toBe(300);
+  });
+});
+
+import { contactDue, nextBirthday, sinceLabel } from './people';
+
+describe('insanlar', () => {
+  it('doğum günü ve yaş', () => {
+    expect(nextBirthday('1999-11-05', '2026-11-02')).toEqual({ date: '2026-11-05', inDays: 3, age: 27 });
+    expect(nextBirthday('03-01', '2026-11-02')).toMatchObject({ date: '2027-03-01' });
+    expect(nextBirthday('2000-11-02', '2026-11-02')).toMatchObject({ inDays: 0, age: 26 });
+  });
+  it('29 Şubat artık olmayan yılda 28 Şubat', () => {
+    expect(nextBirthday('2004-02-29', '2027-01-10')).toMatchObject({ date: '2027-02-28', age: 23 });
+    expect(nextBirthday('2004-02-29', '2028-01-10')).toMatchObject({ date: '2028-02-29' });
+  });
+  it('görüşme hatırlatması', () => {
+    const base = { createdAt: new Date(2026, 9, 1).getTime() };
+    expect(contactDue({ ...base, everyDays: 14, lastContact: '2026-10-25' }, '2026-11-02')).toBeNull();
+    expect(contactDue({ ...base, everyDays: 7, lastContact: '2026-10-25' }, '2026-11-02')).toBe(8);
+    expect(contactDue({ ...base }, '2026-11-02')).toBeNull();
+    expect(sinceLabel(21)).toBe('3 hafta önce');
+  });
+});
+
+describe('kilometre taşları', () => {
+  const base = { library: [], sessions: [], trackers: [], days: {}, people: [], dreams: [] };
+  const entry = (date: string) => ({ id: date, date, text: 'x', createdAt: 0 });
+  it('ilk günlük ve 10 gün taşı tarihleriyle', async () => {
+    const { computeMilestones } = await import('./milestones');
+    const journal = Array.from({ length: 10 }, (_, i) => entry(addDays('2026-10-01', i)));
+    const ms = computeMilestones({ ...base, journal, today: '2026-10-10' });
+    expect(ms.find((m) => m.key === 'journal-1')?.date).toBe('2026-10-01');
+    expect(ms.find((m) => m.key === 'journal-10')?.date).toBe('2026-10-10');
+  });
+  it('ders saati eşiği geçildiği gün', async () => {
+    const { computeMilestones } = await import('./milestones');
+    const sessions = [{ id: 'a', minutes: 400, date: '2026-09-01', createdAt: 0 }, { id: 'b', minutes: 300, date: '2026-09-05', createdAt: 0 }];
+    const ms = computeMilestones({ ...base, journal: [], sessions, today: '2026-10-10' });
+    expect(ms.find((m) => m.key === 'study-10')?.date).toBe('2026-09-05');
+  });
+  it('bir kez gösterilir; eskiler sessizce görülür', async () => {
+    const { freshMilestones } = await import('./milestones');
+    const all = [{ key: 'a', emoji: '', title: '', date: '2026-10-09' }, { key: 'b', emoji: '', title: '', date: '2025-01-01' }, { key: 'c', emoji: '', title: '' }];
+    const r = freshMilestones(all, {}, '2026-10-10');
+    expect(r.show.map((m) => m.key)).toEqual(['a', 'c']);
+    expect(r.silent.map((m) => m.key)).toEqual(['b']);
+    expect(freshMilestones(all, { a: 'x', b: 'x', c: 'x' }, '2026-10-10').show).toEqual([]);
+  });
+});
+
+describe('şimdi ne yapsam', () => {
+  it('yorgunken hafif iş, enerjikken derin iş öne gelir', async () => {
+    const { suggestTasks } = await import('./suggest');
+    const today = '2026-10-14';
+    const list = [task({ id: 'deep', text: 'Rapor yaz', forDate: today, effort: 'deep' }), task({ id: 'light', text: 'Mail at', forDate: today, effort: 'light' })];
+    expect(suggestTasks(list, 'low', today, 600)[0].id).toBe('light');
+    expect(suggestTasks(list, 'high', today, 600)[0].id).toBe('deep');
+  });
+  it('biten ve gelecek günlerin işleri önerilmez; haftanın tarihsiz işleri önerilir', async () => {
+    const { suggestTasks } = await import('./suggest');
+    const today = '2026-10-14';
+    const list = [task({ id: 'done', forDate: today, done: true }), task({ id: 'future', forDate: '2026-10-20' }), task({ id: 'week', forDate: '', weekOf: weekStart(today) })];
+    expect(suggestTasks(list, 'ok', today, 600).map((t) => t.id)).toEqual(['week']);
+  });
+});
+
+describe('keşifler', () => {
+  const mood = tr({ id: 'mood', name: 'Ruh hali', type: 'scale' });
+  const walk = tr({ id: 'walk', name: 'Yürüyüş', type: 'check' });
+  it('az veride susar', async () => {
+    const { findInsights } = await import('./insights');
+    const days: Record<string, DayLog> = {};
+    const dates = Array.from({ length: 6 }, (_, i) => addDays('2026-10-01', i));
+    dates.forEach((d, i) => { days[d] = { id: d, date: d, entries: { mood: 4, walk: i % 2 } }; });
+    expect(findInsights([mood, walk], days, [], dates)).toEqual([]);
+  });
+  it('yeterli ve belirgin farkta bağlantıyı söyler', async () => {
+    const { findInsights } = await import('./insights');
+    const days: Record<string, DayLog> = {};
+    const dates = Array.from({ length: 12 }, (_, i) => addDays('2026-10-01', i));
+    dates.forEach((d, i) => { days[d] = { id: d, date: d, entries: { mood: i % 2 ? 4 : 3, walk: i % 2 } }; });
+    const r = findInsights([mood, walk], days, [], dates);
+    expect(r).toHaveLength(1);
+    expect(r[0].text).toContain('Yürüyüş');
+  });
+});
+
+describe('güneş kartı yorumu', () => {
+  it('yağmurda ve sıcakta saha uyarısı', async () => {
+    const { fieldNote } = await import('../services/weather');
+    const base = { code: 0, tMax: 22, tMin: 10, sunrise: '07:00', sunset: '17:00', radiation: 20, rain: 0, wind: 10, uv: 5 };
+    expect(fieldNote({ ...base, rain: 80 })).toContain('Yağmur');
+    expect(fieldNote({ ...base, tMax: 36 })).toContain('sıcak');
+    expect(fieldNote(base)).toContain('Işınım yüksek');
+  });
+});
+
+describe('rutin geçmişi', () => {
+  it('planlı olmayan günler seriyi bozmaz', async () => {
+    const { routineHistory } = await import('./history');
+    const t = tr({ id: 'gym', days: [1, 3, 5] }); // Pzt, Çar, Cum
+    const days: Record<string, DayLog> = {};
+    for (const d of ['2026-10-05', '2026-10-07', '2026-10-09', '2026-10-12']) days[d] = { id: d, date: d, entries: { gym: 1 } };
+    const h = routineHistory(t, days, '2026-10-13', ctx);
+    expect(h.current).toBe(4);
+    expect(h.best).toBe(4);
+    expect(h.total).toBe(4);
+  });
+});

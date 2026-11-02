@@ -169,6 +169,13 @@ function Body({ initial, draft }: { initial?: Task; draft?: TaskDraft }) {
         </div>
       </Field>
 
+      <Field label="Ne kadar efor? (isteğe bağlı)">
+        <div className="flex flex-wrap gap-1.5">
+          <button type="button" onClick={() => set({ effort: t.effort === 'light' ? undefined : 'light' })} className={`pill ${t.effort === 'light' ? 'active' : ''}`}>🍃 Hafif iş</button>
+          <button type="button" onClick={() => set({ effort: t.effort === 'deep' ? undefined : 'deep' })} className={`pill ${t.effort === 'deep' ? 'active' : ''}`}>🧠 Derin iş</button>
+        </div>
+      </Field>
+
       <Field label="Not (isteğe bağlı)">
         <textarea className="input min-h-[64px] resize-none" value={t.note ?? ''} onChange={(e) => set({ note: e.target.value })} placeholder="Ayrıntı, adres, link…" />
       </Field>

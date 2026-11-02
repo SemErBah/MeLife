@@ -8,6 +8,7 @@ import { allPeriods, spentIn } from '../../finance/utils/period';
 import { useDoneCtx } from '../../hooks/useDay';
 import { useStore } from '../../store/useStore';
 import { fmtMinutes, shortDate } from '../../utils/date';
+import { findInsights } from '../../utils/insights';
 import { avg, bedMinutes, dailySeries, minutesByCourse, rangeDates, routineRates, weeklyStudy } from '../../utils/stats';
 
 type Pt = { label: string; value: number | null };
@@ -62,7 +63,7 @@ const clock = (minsAfter18: number) => {
 };
 
 export default function Stats() {
-  const { trackers, days, sessions, courses } = useStore();
+  const { trackers, days, sessions, courses, journal } = useStore();
   const today = useStore((s) => s.today());
   const ctx = useDoneCtx();
   const [span, setSpan] = useState<'30' | '90'>('30');
@@ -85,10 +86,19 @@ export default function Stats() {
   const study = weeklyStudy(sessions, days, studyT, dates);
   const byCourse = minutesByCourse(sessions, dates);
   const rates = routineRates(live, days, dates, ctx);
+  const insights = useMemo(() => findInsights(trackers, days, journal, rangeDates(today, 90)), [trackers, days, journal, today]);
 
   return (
     <div className="space-y-5">
       <Segmented value={span} onChange={setSpan} options={[{ value: '30', label: 'Son 30 gün' }, { value: '90', label: 'Son 90 gün' }]} />
+
+      {insights.length > 0 && (
+        <section className="now-card space-y-2">
+          <p className="eyebrow">Keşifler · son 90 gün</p>
+          <ul className="space-y-2">{insights.map((i) => <li key={i.key} className="text-[15px] leading-relaxed">🔍 {i.text}</li>)}</ul>
+          <p className="text-[11px] text-text-muted">Bunlar sadece birlikte görülen şeyler; neden-sonuç değil. Yeterli kayıt yoksa hiçbir şey söylemez.</p>
+        </section>
+      )}
 
       {sleepT && (
         <Block title="Uyku" summary={sleepAvg ? <>ort. <b className="text-text-main">{fmtMinutes(sleepAvg)}</b>{bedAvg !== null ? ` · yatış ~${clock(bedAvg)}` : ''}</> : 'kayıt yok'}>

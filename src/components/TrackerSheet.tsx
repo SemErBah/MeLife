@@ -11,6 +11,7 @@ import { fmtMinutes, longDate, sleepMinutes } from '../utils/date';
 import Modal from './Modal';
 import { Field } from './ui';
 import { ReduceBody } from './Reduce';
+import RoutineHistory from './RoutineHistory';
 
 /** Tek bir tracker'ın o günkü kaydını ayrıntılı düzenleme */
 export default function TrackerSheet() {
@@ -172,6 +173,8 @@ function Body({ id, date }: { id: string; date: string }) {
           <Wallet size={16} /> Para sekmesine git
         </button>
       )}
+      <RoutineHistory t={t} />
+
       <button onClick={() => openRoutine(t.id)} className="btn btn-ghost w-full">
         <Pencil size={16} /> Rutini düzenle
       </button>

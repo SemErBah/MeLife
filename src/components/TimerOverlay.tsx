@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Footprints, Minimize2, Square, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { CATEGORIES } from '../constants';
 import { TrackerIcon } from './TrackerIcon';
 import { useStore } from '../store/useStore';
@@ -8,6 +8,7 @@ import { useTimer } from '../store/useTimer';
 import { confirmAction, run, toast } from '../store/useUI';
 import { fmtClock } from '../utils/date';
 import { Ring } from './ui';
+import { currentNoise, onNoiseChange, playNoise, type Noise } from '../utils/noise';
 
 function useElapsed(startedAt: number | undefined) {
   const [now, setNow] = useState(() => Date.now());
@@ -27,6 +28,8 @@ export default function TimerOverlay() {
   const courses = useStore((s) => s.courses).filter((c) => c.status === 'taking' || c.status === 'planned');
   const toggleTask = useStore((s) => s.toggleTask);
   const elapsed = useElapsed(running?.startedAt);
+  // Sayaç bitince ses de susar
+  useEffect(() => { if (!running) playNoise(null); }, [running]);
 
   if (!running) return null;
 
@@ -111,6 +114,8 @@ export default function TimerOverlay() {
                 </div>
               </Ring>
 
+              <FocusSound />
+
               <p className="text-center text-text-muted max-w-xs leading-relaxed">
                 {inWarmup
                   ? `Sadece ${warmupMin} dakika. Sonra istersen bırakabilirsin.`
@@ -133,5 +138,21 @@ export default function TimerOverlay() {
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+const SOUNDS: { id: Noise | null; label: string }[] = [
+  { id: null, label: 'Sessiz' }, { id: 'brown', label: 'Kahverengi' }, { id: 'white', label: 'Beyaz' }, { id: 'cafe', label: 'Kafe' },
+];
+
+/** Odak sesi seçimi (kulaklıkla daha iyi) */
+function FocusSound() {
+  const noise = useSyncExternalStore(onNoiseChange, currentNoise);
+  return (
+    <div className="flex flex-wrap gap-1.5 justify-center -mt-2" role="group" aria-label="Odak sesi">
+      {SOUNDS.map((s) => (
+        <button key={s.label} onClick={() => playNoise(s.id)} className={`pill text-xs ${noise === s.id ? 'active' : ''}`} style={{ minHeight: 30 }}>{s.id === null ? '🔇' : '🎧'} {s.label}</button>
+      ))}
+    </div>
   );
 }

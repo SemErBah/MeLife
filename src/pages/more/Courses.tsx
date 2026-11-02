@@ -137,7 +137,7 @@ function CourseForm({ id, onDone, onAddExam }: { id?: string; onDone: () => void
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    const data: Partial<Course> = { name: name.trim(), code: code.trim(), semester, status, note: note.trim() };
+    const data: Partial<Course> = { name: name.trim(), code: code.trim(), semester, status, note: note.trim(), ...(status === 'passed' && c?.status !== 'passed' ? { passedAt: useStore.getState().today() } : {}) };
     if (!c) Object.assign(data, { order: courses.length, createdAt: Date.now() });
     if (await run(() => saveItem<Course>('courses', data, c?.id), c ? 'Kaydedildi' : 'Ders eklendi')) onDone();
   };

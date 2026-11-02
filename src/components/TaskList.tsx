@@ -6,6 +6,7 @@ import { useStore } from '../store/useStore';
 import { run } from '../store/useUI';
 import type { Task } from '../types';
 import { taskSort } from '../utils/trackers';
+import { haptic } from '../utils/haptic';
 
 /** Bir günün (ya da "bu hafta bir ara" kutusunun) görevleri. Sınır yok. */
 export default function TaskList({ date, weekOf, placeholder = 'Görev ekle…', compact }: {
@@ -54,7 +55,7 @@ export function TaskRow({ t, compact }: { t: Task; compact?: boolean }) {
   return (
     <div className={`row-item ${t.done ? 'is-done' : ''} ${compact ? 'py-1.5' : ''}`} style={{ '--c': color } as React.CSSProperties}>
       <button
-        onClick={() => run(() => toggleTask(t.id))}
+        onClick={() => { if (!t.done) haptic(); run(() => toggleTask(t.id)); }}
         className={`check-btn ${t.done ? 'done animate-pop' : ''}`}
         style={{ width: 34, height: 34, minWidth: 34, minHeight: 34 }}
         aria-label={t.done ? 'Geri al' : 'Tamamlandı'}

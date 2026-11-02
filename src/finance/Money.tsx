@@ -46,7 +46,7 @@ export default function Money() {
     : `${parseDate(current.start).toLocaleDateString('tr-TR', { month: 'long' })} başından beri`;
 
   return (
-    <div className="page max-w-3xl">
+    <div className="page max-w-3xl lg:max-w-6xl">
       <header className="space-y-1">
         <div className="flex items-center justify-between">
           <p className="text-sm text-text-muted">
@@ -58,6 +58,9 @@ export default function Money() {
         <h1 className="page-title">Para</h1>
       </header>
 
+      {/* Geniş ekranda iki sütun: solda özet ve kayıtlar, sağda hesaplar */}
+      <div className="grid lg:grid-cols-[1.15fr_1fr] gap-[1.75rem] items-start">
+      <div className="space-y-[1.75rem] min-w-0">
       {/* Özet: tek sakin rakam */}
       <section className="now-card space-y-4">
         <div>
@@ -96,13 +99,17 @@ export default function Money() {
           <Categories current={current} previous={previous} />
         </>
       )}
+      </div>
 
+      <div className="space-y-[1.75rem] min-w-0">
       <Accounts />
       <Debts debts={debts} />
       <Bills today={today} />
       <Goals />
 
       <button onClick={() => open({ t: 'settings' })} className="btn btn-ghost w-full"><Settings2 size={16} /> Para ayarları</button>
+      </div>
+      </div>
     </div>
   );
 }

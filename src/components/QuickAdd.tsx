@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, Banknote, Lightbulb, ListTodo, Minus, Plus, Repeat } from 'lucide-react';
+import { ArrowLeftRight, Banknote, BookHeart, Lightbulb, ListTodo, Minus, Plus, Repeat } from 'lucide-react';
 import { useState } from 'react';
 import { CATEGORIES } from '../constants';
 import { TrackerIcon } from './TrackerIcon';
@@ -9,6 +9,7 @@ import { useSheets } from '../store/useSheets';
 import { useStore } from '../store/useStore';
 import { run } from '../store/useUI';
 import Modal from './Modal';
+import { useLogContact } from '../hooks/useLogContact';
 
 const MONEY_OPTIONS: { label: string; icon: React.ReactNode; sheet: MoneySheet }[] = [
   { label: 'Harcama', icon: <Minus size={18} />, sheet: { t: 'editor', preset: { kind: 'expense' } } },
@@ -58,7 +59,12 @@ function Body({ onMoney }: { onMoney: (s: MoneySheet) => void }) {
 
   return (
     <div className="space-y-7">
-      <button onClick={() => openTask(null)} className="btn btn-primary w-full py-3.5"><ListTodo size={18} /> Görev ekle</button>
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={() => openTask(null)} className="btn btn-primary py-3.5"><ListTodo size={18} /> Görev</button>
+        <button onClick={() => { setQuick(false); useStore.getState().setTab('notes'); }} className="btn btn-ghost py-3.5"><BookHeart size={18} /> Günlüğe yaz</button>
+      </div>
+
+      <TalkedTo />
 
       <div>
         <p className="field-label">Para</p>
@@ -103,6 +109,25 @@ function Body({ onMoney }: { onMoney: (s: MoneySheet) => void }) {
         />
         <button type="submit" disabled={!text.trim()} className="btn btn-primary w-full">Not olarak kaydet</button>
       </form>
+    </div>
+  );
+}
+
+/** "Kişiyle konuştum": en uzun süredir konuşulmayanlar önce */
+function TalkedTo() {
+  const people = useStore((s) => s.people);
+  const setQuick = useSheets((s) => s.setQuick);
+  const logContact = useLogContact();
+  if (!people.length) return null;
+  const sorted = [...people].sort((a, b) => (a.lastContact ?? '').localeCompare(b.lastContact ?? '')).slice(0, 8);
+  return (
+    <div>
+      <p className="field-label">Kişiyle konuştum</p>
+      <div className="flex flex-wrap gap-1.5">
+        {sorted.map((p) => (
+          <button key={p.id} onClick={async () => { if (await logContact(p.id, 'talk')) setQuick(false); }} className="pill">{p.name.split(' ')[0]}</button>
+        ))}
+      </div>
     </div>
   );
 }

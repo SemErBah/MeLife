@@ -1,10 +1,12 @@
-import { Footprints, Play } from 'lucide-react';
+import { Footprints, Play, Shuffle } from 'lucide-react';
 import { useState } from 'react';
 import { useSheets } from '../store/useSheets';
 import { useStore } from '../store/useStore';
 import { useTimer } from '../store/useTimer';
 import { run } from '../store/useUI';
 import { taskSort } from '../utils/trackers';
+import { nowToMin } from '../utils/date';
+import { suggestTasks, type Energy } from '../utils/suggest';
 import Modal from './Modal';
 
 export const PICK = '__pick';
@@ -16,28 +18,70 @@ export default function StartSmall() {
   const start = useSheets((s) => s.start);
   const openStart = useSheets((s) => s.openStart);
   return (
-    <Modal isOpen={!!start} onClose={() => openStart(null)} title="Başlayamıyorum">
+    <Modal isOpen={!!start} onClose={() => openStart(null)} title={start === PICK ? 'Şimdi ne yapsam?' : 'Küçük başla'}>
       {start === PICK ? <Pick /> : start ? <Step key={start} taskId={start} /> : null}
     </Modal>
   );
 }
 
+const ENERGY: { id: Energy; emoji: string; label: string }[] = [
+  { id: 'low', emoji: '🪫', label: 'Yorgunum' },
+  { id: 'ok', emoji: '🙂', label: 'İdare eder' },
+  { id: 'high', emoji: '⚡', label: 'Enerjik' },
+];
+
+/** "Şimdi ne yapsam?": enerjini sor, tek bir öneri getir; istersen listeden kendin seç */
 function Pick() {
   const today = useStore((s) => s.today());
+  const now = useStore((s) => s.now);
   const dayStartHour = useStore((s) => s.settings.dayStartHour);
-  const tasks = useStore((s) => s.tasks).filter((t) => t.forDate === today && !t.done).sort(taskSort(dayStartHour));
+  const all = useStore((s) => s.tasks);
+  const tasks = all.filter((t) => t.forDate === today && !t.done).sort(taskSort(dayStartHour));
   const openStart = useSheets((s) => s.openStart);
+  const [energy, setEnergy] = useState<Energy | null>(null);
+  const [shift, setShift] = useState(0);
+  const list = energy ? suggestTasks(all, energy, today, nowToMin(now, dayStartHour), dayStartHour) : [];
+  const pick = list.length ? list[shift % list.length] : undefined;
+
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-text-muted leading-relaxed">Hangisi? Bütününü düşünme; sadece ilk küçük adımı bulacağız.</p>
-      {tasks.length === 0
-        ? <p className="text-sm text-text-muted">Bugün için açık görev yok. Plan'a bir şey ekleyip buradan başlayabilirsin.</p>
-        : tasks.map((t) => (
-          <button key={t.id} onClick={() => openStart(t.id)} className="row-item w-full text-left min-h-0">
-            <Footprints size={16} className="text-accent shrink-0" />
-            <span className="flex-1 text-[15px] font-medium">{t.text}</span>
-          </button>
-        ))}
+    <div className="space-y-5">
+      <div>
+        <p className="text-sm text-text-muted mb-2">Enerjin şu an nasıl?</p>
+        <div className="grid grid-cols-3 gap-2">
+          {ENERGY.map((e) => (
+            <button key={e.id} onClick={() => { setEnergy(e.id); setShift(0); }} className={`chip-tile py-3 ${energy === e.id ? 'active' : ''}`}>
+              <span className="text-2xl leading-none">{e.emoji}</span>
+              <span className="text-xs font-semibold">{e.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {energy && (pick ? (
+        <div className="now-card space-y-3">
+          <p className="eyebrow">{energy === 'low' ? 'Hafif bir şeyle başla' : energy === 'high' ? 'Enerjin varken büyüğüne dokun' : 'Şuna ne dersin?'}</p>
+          <p className="font-display text-[20px] font-semibold leading-snug">{pick.text}</p>
+          <div className="flex gap-2">
+            <button onClick={() => openStart(pick.id)} className="btn btn-primary flex-1"><Play size={15} fill="currentColor" /> Başla</button>
+            {list.length > 1 && <button onClick={() => setShift(shift + 1)} className="btn btn-ghost shrink-0"><Shuffle size={15} /> Başka</button>}
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-text-muted">{energy === 'low' ? 'Açık iş yok. Belki biraz dinlenmek tam da yapılacak şeydir. 🌿' : "Açık iş yok. Plan'a bir şey ekleyebilir ya da günün tadını çıkarabilirsin."}</p>
+      ))}
+
+      {tasks.length > 0 && (
+        <div>
+          <p className="field-label">Ya da kendin seç</p>
+          {tasks.map((t) => (
+            <button key={t.id} onClick={() => openStart(t.id)} className="row-item w-full text-left min-h-0">
+              <Footprints size={16} className="text-accent shrink-0" />
+              <span className="flex-1 text-[15px] font-medium">{t.text}</span>
+              {t.effort && <span className="text-xs">{t.effort === 'light' ? '🍃' : '🧠'}</span>}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

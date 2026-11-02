@@ -94,6 +94,14 @@ export default function Reminders() {
         </div>
       </section>
 
+      {settings.telegramChatId && (
+        <section className="now-card space-y-1.5">
+          <p className="eyebrow">Bota yazabilirsin</p>
+          <p className="text-sm leading-relaxed">Düz bir mesaj → <b>Aklımdakiler</b>. <b>/g</b> ile başlarsan → <b>günlüğüne</b> yazılır. Ör: <i>/g Bugün sahada inverter arızasını çözdük #saha</i></p>
+          <p className="text-[11px] text-text-muted">Bot birkaç dakikada bir uyanır; cevabı 5 dakika içinde gelir.</p>
+        </section>
+      )}
+
       {/* Planlama soruları */}
       <section className="settings-group">
         <h3>Planlama soruları</h3>
@@ -111,6 +119,13 @@ export default function Reminders() {
               <p className="text-xs text-text-muted mt-0.5">"Maaş yattı mı?", "Fatura ödendi mi?"</p>
             </div>
             <Toggle checked={planning.money !== false} onChange={(v) => setPlanning({ money: v })} label="Para soruları" />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold">İnsanlar</p>
+              <p className="text-xs text-text-muted mt-0.5">Doğum günleri ve "uzun zamandır konuşmadın" soruları (10:30)</p>
+            </div>
+            <Toggle checked={planning.people !== false} onChange={(v) => setPlanning({ people: v })} label="İnsan hatırlatmaları" />
           </div>
         </div>
       </section>

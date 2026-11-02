@@ -7,8 +7,10 @@ import { useDoneCtx } from '../hooks/useDay';
 import { useSheets } from '../store/useSheets';
 import { useStore } from '../store/useStore';
 import { run, toast } from '../store/useUI';
-import type { Intention, Task } from '../types';
-import { addDays, fmtMinutes, longDate, shortDate, shortWeekday, weekStart } from '../utils/date';
+import type { Intention, JournalEntry, Task } from '../types';
+import { promptFor } from '../utils/prompts';
+import { extractPeople, extractTags } from '../utils/journal';
+import { addDays, fmtMinutes, longDate, nowHHMM, shortDate, shortWeekday, weekStart } from '../utils/date';
 import { daySummary, weekSummary } from '../utils/review';
 import TaskList from './TaskList';
 import { useFinance } from '../finance/store/useFinance';
@@ -101,10 +103,10 @@ function OpenTaskRow({ t, actions }: { t: Task; actions: { label: string; icon?:
 /* ═══ Günü kapat ═══════════════════════════════════════ */
 
 function DayFlow({ date, onClose }: { date: string; onClose: () => void }) {
-  const { trackers, days, tasks, updateTask, removeTask, setDayNote, setEntry, closeDay } = useStore();
+  const { trackers, days, tasks, updateTask, removeTask, setEntry, closeDay, saveItem, people } = useStore();
   const ctx = useDoneCtx();
   const [step, setStep] = useState(0);
-  const [note, setNote] = useState(days[date]?.note ?? '');
+  const [note, setNote] = useState('');
   const s = useMemo(() => daySummary(date, { trackers, days, tasks, ctx }), [date, trackers, days, tasks, ctx]);
   const tomorrow = addDays(date, 1);
   const mood = trackers.find((t) => t.active && !t.paused && t.type === 'scale');
@@ -113,7 +115,14 @@ function DayFlow({ date, onClose }: { date: string; onClose: () => void }) {
 
   const finish = async () => {
     if (await run(async () => {
-      if (note.trim() !== (days[date]?.note ?? '')) await setDayNote(note.trim(), date);
+      // Bugünü günlüğe yaz (isteğe bağlı)
+      if (note.trim()) {
+        await saveItem<JournalEntry>('journal', {
+          date, time: nowHHMM(), text: note.trim(), prompt: promptFor(date),
+          tags: extractTags(note), people: extractPeople(note, people),
+          mood: mood ? moodVal || 0 : 0, createdAt: Date.now(), source: 'app',
+        });
+      }
       await closeDay(date);
     })) {
       toast('İyi geceler 🌙');
@@ -175,8 +184,9 @@ function DayFlow({ date, onClose }: { date: string; onClose: () => void }) {
           )}
 
           <label className="block">
-            <span className="field-label">Bir satır (isteğe bağlı)</span>
-            <textarea className="input min-h-[80px] resize-none" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ne iyi gitti, ne zorladı?" />
+            <span className="field-label">Bugünü günlüğe yaz (isteğe bağlı)</span>
+            <span className="block font-display text-[16px] mb-2">{promptFor(date)}</span>
+            <textarea className="input journal-text min-h-[110px] resize-none" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bir satır bile yeter…" />
           </label>
         </>
       ) : (

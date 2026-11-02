@@ -686,3 +686,22 @@
   @media (min-width: 1024px) { .app-main { padding-bottom: 0; } }
   .fab-pos { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* ═══ v4 — hayat defteri dokunuşları ═══ */
+@layer components {
+  /* Günün saatine göre başlık ışığı */
+  .ambient {
+    position: absolute; left: -2rem; right: -2rem; top: -1.5rem; height: 300px;
+    pointer-events: none; z-index: 0; opacity: .9;
+    background: radial-gradient(70% 100% at 15% 0%, var(--tod), transparent 70%);
+    transition: background 1s ease;
+  }
+  .ambient[data-tod="dawn"]    { --tod: color-mix(in srgb, #f4b183 22%, transparent); }
+  .ambient[data-tod="day"]     { --tod: color-mix(in srgb, #9fd8b7 16%, transparent); }
+  .ambient[data-tod="evening"] { --tod: color-mix(in srgb, #f08a5d 22%, transparent); }
+  .ambient[data-tod="night"]   { --tod: color-mix(in srgb, #6d7fd8 20%, transparent); }
+  .page > *:not(.ambient) { position: relative; z-index: 1; }
+
+  /* Günlük metni: kitap gibi okunur */
+  .journal-text { font-family: var(--font-display); font-optical-sizing: auto; font-size: 1.0625rem; line-height: 1.7; white-space: pre-line; }
+}

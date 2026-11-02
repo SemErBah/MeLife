@@ -33,6 +33,8 @@ export default function Calendar() {
   const counts = useMemo(() => Object.fromEntries(cells.filter(Boolean).map((d) => [d, doneCount(trackers, days[d!], d!, tasks, ctx)])), [cells, trackers, days, tasks, ctx]);
   const max = Math.max(1, ...Object.values(counts) as number[]);
   const examDays = new Set(exams.map((e) => e.date));
+  const journalList = useStore((s) => s.journal);
+  const journalDays = new Set(journalList.map((e) => e.date));
   const shift = (n: number) => setCursor(({ y, m }) => { const d = new Date(y, m + n, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
 
   const pastWeeks = Object.values(weeks).filter((w) => w.good || w.hard).sort((a, b) => b.id.localeCompare(a.id));
@@ -59,12 +61,13 @@ export default function Calendar() {
               >
                 {Number(d.slice(8))}
                 {examDays.has(d) && <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--cat-mind)' }} />}
+                {journalDays.has(d) && <span className="absolute bottom-1 left-1.5 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--cat-mood)' }} />}
                 {days[d]?.closedAt && <span className="absolute top-1 right-1 w-1 h-1 rounded-full bg-text-muted" />}
               </button>
             );
           })}
         </div>
-        <p className="text-[11px] text-text-muted mt-3">Renk koyulaştıkça o gün daha çok şey kaydettin · mor nokta: sınav</p>
+        <p className="text-[11px] text-text-muted mt-3">Renk koyulaştıkça o gün daha çok şey kaydettin · mor nokta: sınav · pembe nokta: günlük</p>
       </section>
 
       {pastWeeks.length > 0 && (
@@ -90,7 +93,8 @@ export default function Calendar() {
 }
 
 function DaySheet({ date, onGo }: { date: string; onGo: () => void }) {
-  const { trackers, days, tasks, exams, courses, goToDate } = useStore();
+  const { trackers, days, tasks, exams, courses, goToDate, journal } = useStore();
+  const entries = journal.filter((e) => e.date === date);
   const { transactions } = useFinance();
   const ctx = useDoneCtx();
   const s = daySummary(date, { trackers, days, tasks, ctx });
@@ -122,11 +126,20 @@ function DaySheet({ date, onGo }: { date: string; onGo: () => void }) {
         </ul>
       )}
 
+      {entries.map((e) => (
+        <div key={e.id} className="rounded-2xl bg-surface-el p-3 space-y-1">
+          <p className="text-[11px] text-text-muted num">{e.time}{e.important ? ' · ⭐' : ''}</p>
+          {e.title && <p className="font-semibold">{e.title}</p>}
+          <p className="journal-text text-[15px]">{e.text}</p>
+          {e.photo && <img src={e.photo} alt="" className="w-full max-h-48 object-cover rounded-xl mt-2" loading="lazy" />}
+        </div>
+      ))}
+
       {day?.note && (
         <p className="text-sm leading-relaxed rounded-2xl bg-surface-el p-3 flex gap-2"><NotebookPen size={15} className="text-text-muted shrink-0 mt-0.5" /> {day.note}</p>
       )}
 
-      {!s.doneTasks.length && !s.doneRoutines.length && !day?.note && !spent && !dayExams.length && (
+      {!s.doneTasks.length && !s.doneRoutines.length && !day?.note && !entries.length && !spent && !dayExams.length && (
         <p className="text-sm text-text-muted">Bu gün için kayıt yok.</p>
       )}
 
