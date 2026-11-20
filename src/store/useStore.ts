@@ -179,7 +179,7 @@ export const useStore = create<AppState>((set, get) => {
       b.watchCol<YearGoal>('yearGoals', once((yearGoals) => set({ yearGoals: yearGoals.sort((a, c) => a.createdAt - c.createdAt) }))),
       b.watchCol<Moment>('moments', once((moments) => set({ moments }))),
       b.watchCol<ShopItem>('shopping', once((items) => set({ shopping: items.sort((a, c) => a.createdAt - c.createdAt) }))),
-      b.watchCol<ShopTrip>('shopTrips', once((items) => set({ shopTrips: items.sort((a, c) => c.date.localeCompare(a.date) || c.createdAt - a.createdAt) }))),
+      b.watchCol<ShopTrip>('shopTrips', once((items) => set({ shopTrips: items.sort((a, c) => c.date.localeCompare(a.date) || (c.time ?? '').localeCompare(a.time ?? '') || c.createdAt - a.createdAt) }))),
       b.watchCol<InboxItem>('inbox', once((items) => set({ inbox: items.sort((a, c) => c.createdAt - a.createdAt) }))),
     ];
   }

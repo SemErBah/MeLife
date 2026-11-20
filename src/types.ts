@@ -327,6 +327,7 @@ export interface ShopLine {
 export interface ShopTrip {
   id: string;
   date: string;
+  time?: string;         // "14:32"
   store?: string;
   items: ShopLine[];
   total: number;

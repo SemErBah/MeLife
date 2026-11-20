@@ -1,4 +1,4 @@
-import { Check, Plus, Receipt, Search, ShoppingCart, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react';
+import { Check, Pencil, Plus, Receipt, RotateCcw, Search, ShoppingCart, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import Modal from '../../components/Modal';
 import { Field, Segmented, Toggle } from '../../components/ui';
@@ -7,20 +7,21 @@ import { fmt, parseAmount } from '../../finance/utils/format';
 import { useStore } from '../../store/useStore';
 import { confirmAction, run, undoToast } from '../../store/useUI';
 import type { ShopItem, ShopLine, ShopTrip } from '../../types';
-import { fromKey, shortDate } from '../../utils/date';
+import { longDate, nowHHMM, shortDate } from '../../utils/date';
 import { frequentItems, itemKey, itemStats, knownStores, parseEntry, priceChange, tripTotal, type ItemStats } from '../../utils/shopping';
 
 type Tab = 'list' | 'history' | 'prices';
 type Checkout = { tripId?: string; lines: ShopLine[]; removeIds: string[] } | null;
 
 const stamp = () => Date.now();
-const fmtMonth = new Intl.DateTimeFormat('tr-TR', { month: 'long', year: 'numeric' });
 
 /** Alışveriş listesi, geçmiş alışverişler ve ürün fiyatları */
 export default function Shopping() {
   const trips = useStore((s) => s.shopTrips);
   const [tab, setTab] = useState<Tab>('list');
   const [checkout, setCheckout] = useState<Checkout>(null);
+  const [detail, setDetail] = useState<string | null>(null);
+  const detailTrip = trips.find((t) => t.id === detail);
   const stats = useMemo(() => itemStats(trips), [trips]);
 
   return (
@@ -31,10 +32,14 @@ export default function Shopping() {
         { value: 'prices', label: 'Fiyatlar' },
       ]} />
       {tab === 'list' && <ListView stats={stats} onCheckout={setCheckout} />}
-      {tab === 'history' && <HistoryView onOpen={setCheckout} />}
+      {tab === 'history' && <HistoryView onOpen={setCheckout} onShow={setDetail} />}
       {tab === 'prices' && <PricesView stats={stats} />}
 
-      <Modal isOpen={!!checkout} onClose={() => setCheckout(null)} title={checkout?.tripId ? 'Alışveriş' : 'Alışverişi kaydet'}>
+      <Modal isOpen={!!detailTrip} onClose={() => setDetail(null)} title={detailTrip ? tripTitle(detailTrip) : ''}>
+        {detail && <TripDetail id={detail} onDone={() => setDetail(null)} onEdit={() => { const t = detailTrip; setDetail(null); if (t) setCheckout({ tripId: t.id, lines: t.items, removeIds: [] }); }} />}
+      </Modal>
+
+      <Modal isOpen={!!checkout} onClose={() => setCheckout(null)} title={checkout?.tripId ? 'Alışverişi düzenle' : 'Alışverişi kaydet'}>
         {checkout && <CheckoutForm key={checkout.tripId ?? 'new'} {...checkout} stats={stats} onDone={() => setCheckout(null)} />}
       </Modal>
     </div>
@@ -193,6 +198,7 @@ function CheckoutForm({ tripId, lines: initial, removeIds, stats: allStats, onDo
   const openMoney = useMoneySheets((s) => s.open);
   const trip = tripId ? shopTrips.find((t) => t.id === tripId) : undefined;
   const [date, setDate] = useState(trip?.date ?? today);
+  const [time, setTime] = useState(trip ? trip.time ?? '' : removeIds.length ? nowHHMM() : ''); // listeden bitirince şimdiki saat
   const [store, setStore] = useState(trip?.store ?? '');
   const [rows, setRows] = useState(() => (trip?.items ?? initial).map((l) => ({ name: l.name, qty: l.qty ?? '', price: l.price != null ? String(l.price).replace('.', ',') : '' })));
   const [toMoney, setToMoney] = useState(removeIds.length > 0); // geçmiş alışveriş eklerken harcama zaten girilmiş olabilir
@@ -208,7 +214,7 @@ function CheckoutForm({ tripId, lines: initial, removeIds, stats: allStats, onDo
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!lines.length) return;
-    const data = { date, store: store.trim(), items: lines, total, ...(trip ? {} : { createdAt: stamp() }) };
+    const data = { date, time, store: store.trim(), items: lines, total, ...(trip ? {} : { createdAt: stamp() }) };
     const ok = await run(async () => {
       await saveItem<ShopTrip>('shopTrips', data, tripId);
       await Promise.all(removeIds.map((id) => removeItem('shopping', id)));
@@ -222,10 +228,11 @@ function CheckoutForm({ tripId, lines: initial, removeIds, stats: allStats, onDo
 
   return (
     <form onSubmit={save} className="space-y-5">
-      <div className="grid grid-cols-[150px_1fr] gap-3">
+      <div className="grid grid-cols-[1fr_130px] gap-3">
         <Field label="Tarih"><input type="date" className="input num" value={date} max={today} onChange={(e) => setDate(e.target.value)} /></Field>
-        <Field label="Nereden"><input className="input" value={store} onChange={(e) => setStore(e.target.value)} placeholder="Migros, pazar…" /></Field>
+        <Field label="Saat"><input type="time" className="input num" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
       </div>
+      <Field label="Nereden"><input className="input" value={store} onChange={(e) => setStore(e.target.value)} placeholder="Migros, pazar…" /></Field>
       {stores.length > 0 && (
         <div className="flex flex-wrap gap-1.5 -mt-3">
           {stores.map((s) => <button type="button" key={s} onClick={() => setStore(s)} className={`pill ${store === s ? 'active' : ''}`}>{s}</button>)}
@@ -285,40 +292,88 @@ function CheckoutForm({ tripId, lines: initial, removeIds, stats: allStats, onDo
 
 /* ── Geçmiş ────────────────────────────────────────────── */
 
-function HistoryView({ onOpen }: { onOpen: (c: Checkout) => void }) {
+function HistoryView({ onOpen, onShow }: { onOpen: (c: Checkout) => void; onShow: (id: string) => void }) {
   const trips = useStore((s) => s.shopTrips);
-  const months = useMemo(() => trips.reduce<{ key: string; trips: ShopTrip[]; total: number }[]>((acc, t) => {
-    const key = t.date.slice(0, 7);
-    const last = acc[acc.length - 1];
-    if (last?.key === key) { last.trips.push(t); last.total += t.total; } else acc.push({ key, trips: [t], total: t.total });
-    return acc;
-  }, []), [trips]);
+  const today = useStore((s) => s.today());
+  const month = trips.filter((t) => t.date.slice(0, 7) === today.slice(0, 7));
+  const monthTotal = Math.round(month.reduce((a, t) => a + t.total, 0) * 100) / 100;
 
   return (
     <div className="space-y-5">
       <button onClick={() => onOpen({ lines: [{ name: '' }], removeIds: [] })} className="btn btn-ghost w-full"><Plus size={16} /> Geçmiş bir alışveriş ekle</button>
-      {months.length === 0 ? (
+      {trips.length === 0 ? (
         <p className="text-sm text-text-muted text-center py-8 max-w-xs mx-auto leading-relaxed">Henüz kayıtlı alışveriş yok. Listeden "Alışverişi bitir" dediğinde burada görünür.</p>
-      ) : months.map((m) => (
-        <section key={m.key} className="widget">
+      ) : (
+        <section className="widget">
           <div className="widget-header">
-            <h3 className="capitalize">{fmtMonth.format(fromKey(`${m.key}-01`))}</h3>
-            <span className="text-sm font-semibold num">{fmt(Math.round(m.total * 100) / 100)}</span>
+            <h3><Receipt size={16} /> Alışverişlerim</h3>
+            {month.length > 0 && <span className="text-xs text-text-muted">Bu ay {month.length} alışveriş · <b className="text-text-main num">{fmt(monthTotal)}</b></span>}
           </div>
           <div className="px-2 pb-3 sm:px-3">
-            {m.trips.map((t) => (
-              <button key={t.id} onClick={() => onOpen({ tripId: t.id, lines: t.items, removeIds: [] })} className="row-item w-full text-left min-h-0">
+            {trips.map((t) => (
+              <button key={t.id} onClick={() => onShow(t.id)} className="row-item w-full text-left min-h-0">
                 <span className="cat-bubble sm" style={{ '--c': 'var(--accent-base)' } as React.CSSProperties}><ShoppingCart size={16} /></span>
                 <span className="flex-1 min-w-0">
-                  <span className="block text-[15px] font-semibold truncate">{t.store || 'Alışveriş'}</span>
-                  <span className="block text-xs text-text-muted truncate">{shortDate(t.date)} · {t.items.length} ürün · {t.items.slice(0, 4).map((l) => l.name).join(', ')}{t.items.length > 4 ? '…' : ''}</span>
+                  <span className="block text-[15px] font-semibold truncate">{tripTitle(t)}</span>
+                  <span className="block text-xs text-text-muted truncate">{tripWhen(t, today)} · {t.items.length} ürün</span>
                 </span>
                 <span className="text-sm font-semibold num shrink-0">{t.total ? fmt(t.total) : '–'}</span>
               </button>
             ))}
           </div>
         </section>
-      ))}
+      )}
+    </div>
+  );
+}
+
+const tripTitle = (t: ShopTrip) => `${t.store?.trim() || 'Market'} alışverişi`;
+/** "20 Kasım Cuma, 14:32" (geçen yıllarda yıl da yazılır) */
+const tripWhen = (t: ShopTrip, today: string) =>
+  `${longDate(t.date)}${t.date.slice(0, 4) !== today.slice(0, 4) ? ` ${t.date.slice(0, 4)}` : ''}${t.time ? `, ${t.time}` : ''}`;
+
+/** Bir alışverişin içi: alınanlar ve fiyatları */
+function TripDetail({ id, onEdit, onDone }: { id: string; onEdit: () => void; onDone: () => void }) {
+  const { shopTrips, shopping, saveItem, removeItem, restoreItem } = useStore();
+  const today = useStore((s) => s.today());
+  const t = shopTrips.find((x) => x.id === id);
+  if (!t) return null;
+  const missing = t.items.filter((l) => !shopping.some((i) => !i.done && itemKey(i.name) === itemKey(l.name)));
+
+  const again = async () => {
+    if (await run(() => Promise.all(missing.map((l) => saveItem<ShopItem>('shopping', { name: l.name, ...(l.qty ? { qty: l.qty } : {}), createdAt: stamp() }))), `${missing.length} ürün listeye eklendi`)) onDone();
+  };
+  const remove = async () => {
+    if (!await confirmAction({ title: 'Bu alışveriş silinsin mi?', message: "Fiyat geçmişinden de çıkar. Para'daki harcama kaydı silinmez.", confirmLabel: 'Sil', danger: true })) return;
+    const snap = { ...t } as unknown as Record<string, unknown>;
+    if (await run(() => removeItem('shopTrips', t.id))) { onDone(); undoToast('Silindi', () => restoreItem('shopTrips', t.id, snap)); }
+  };
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-text-muted -mt-1">{tripWhen(t, today)}</p>
+      <ul className="divide-y divide-border">
+        {t.items.map((l, i) => (
+          <li key={i} className="flex items-baseline justify-between gap-3 py-2.5">
+            <span className="min-w-0">
+              <span className="text-[15px] font-medium">{l.name}</span>
+              {l.qty && <span className="text-sm text-text-muted"> · {l.qty}</span>}
+            </span>
+            <span className="num font-semibold shrink-0">{l.price ? fmt(l.price) : <span className="text-text-muted font-normal">–</span>}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-baseline justify-between border-t border-border pt-4">
+        <span className="text-sm text-text-muted">Toplam · {t.items.length} ürün</span>
+        <span className="font-display text-2xl font-semibold num">{fmt(t.total)}</span>
+      </div>
+      <div className="space-y-2">
+        {missing.length > 0 && <button onClick={again} className="btn btn-primary w-full"><RotateCcw size={16} /> Hepsini tekrar listeye ekle</button>}
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={onEdit} className="btn btn-ghost"><Pencil size={16} /> Düzenle</button>
+          <button onClick={remove} className="btn btn-ghost"><Trash2 size={16} /> Sil</button>
+        </div>
+      </div>
     </div>
   );
 }
