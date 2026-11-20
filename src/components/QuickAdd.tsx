@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, Banknote, BookHeart, GraduationCap, Lightbulb, ListTodo, Minus, Plus, Repeat } from 'lucide-react';
+import { ArrowLeftRight, Banknote, BookHeart, GraduationCap, Lightbulb, ListTodo, Minus, Plus, Repeat, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
 import { CATEGORIES } from '../constants';
 import { TrackerIcon } from './TrackerIcon';
@@ -65,7 +65,8 @@ function Body({ onMoney }: { onMoney: (s: MoneySheet) => void }) {
       <div className="grid grid-cols-2 gap-2">
         <button onClick={() => openTask(null)} className="btn btn-primary py-3.5"><ListTodo size={18} /> Görev</button>
         <button onClick={() => { setQuick(false); useStore.getState().setTab('notes'); }} className="btn btn-ghost py-3.5"><BookHeart size={18} /> Günlüğe yaz</button>
-        {!busy && <button onClick={() => { setQuick(false); startStudy(); }} className="btn btn-ghost py-3.5 col-span-2"><GraduationCap size={18} /> Ders çalışmaya başla</button>}
+        <button onClick={() => { setQuick(false); useStore.getState().openMore('shopping'); }} className={`btn btn-ghost py-3.5 ${busy ? 'col-span-2' : ''}`}><ShoppingCart size={18} /> Alışveriş listesi</button>
+        {!busy && <button onClick={() => { setQuick(false); startStudy(); }} className="btn btn-ghost py-3.5"><GraduationCap size={18} /> Ders çalış</button>}
       </div>
 
       <TalkedTo />

@@ -1,4 +1,4 @@
-import { BellRing, BookOpen, CalendarDays, ChartColumn, ChevronLeft, ChevronRight, GraduationCap, History, Repeat, Settings2, Sparkles, Users } from 'lucide-react';
+import { BellRing, BookOpen, CalendarDays, ChartColumn, ChevronLeft, ChevronRight, GraduationCap, History, Repeat, Settings2, ShoppingCart, Sparkles, Users } from 'lucide-react';
 import { lazy, Suspense } from 'react';
 import ProfileButton from '../components/ProfileButton';
 import { useStore, type MoreView } from '../store/useStore';
@@ -15,11 +15,13 @@ const Reminders = lazy(() => import('./more/Reminders'));
 const People = lazy(() => import('./more/People'));
 const Dreams = lazy(() => import('./more/Dreams'));
 const Timeline = lazy(() => import('./more/Timeline'));
+const Shopping = lazy(() => import('./more/Shopping'));
 
 const VIEWS: Record<MoreView, { title: string; icon: React.ReactNode; render: () => React.ReactNode }> = {
   people: { title: 'İnsanlar', icon: <Users size={18} />, render: () => <People /> },
   dreams: { title: 'Hayaller & niyetler', icon: <Sparkles size={18} />, render: () => <Dreams /> },
   timeline: { title: 'Hayat çizelgesi', icon: <History size={18} />, render: () => <Timeline /> },
+  shopping: { title: 'Alışveriş', icon: <ShoppingCart size={18} />, render: () => <Shopping /> },
   routines: { title: 'Rutinlerim', icon: <Repeat size={18} />, render: () => <Routines /> },
   library: { title: 'Kütüphane', icon: <BookOpen size={18} />, render: () => <Library /> },
   courses: { title: 'Ders & sınavlar', icon: <GraduationCap size={18} />, render: () => <Courses /> },
@@ -58,7 +60,7 @@ export default function More() {
 }
 
 function Hub() {
-  const { trackers, library, exams, courses, settings, people, dreams, yearGoals, moments, journal } = useStore();
+  const { trackers, library, exams, courses, settings, people, dreams, yearGoals, moments, journal, shopping } = useStore();
   const today = useStore((s) => s.today());
   const openMore = useStore((s) => s.openMore);
 
@@ -73,6 +75,7 @@ function Hub() {
     people: people.length ? `${people.length} kişi` : 'Sevdiklerin, doğum günleri',
     dreams: goals || dreams.length ? `${goals} niyet · ${dreams.filter((d) => d.status !== 'done').length} hayal` : 'Bir gün… listesi, yılın niyetleri',
     timeline: lifeCount ? `${lifeCount} önemli an` : 'Hayatının önemli anları',
+    shopping: shopping.length ? `Listede ${shopping.filter((i) => !i.done).length} ürün` : 'Liste, geçmiş, fiyatlar',
     routines: `${trackers.filter((t) => t.active && !t.paused).length} aktif`,
     library: doing ? `${doing} şey devam ediyor` : library.length ? `${library.length} kayıt` : 'Kitap, film, kurs, podcast',
     courses: nextExam

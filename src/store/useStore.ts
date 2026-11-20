@@ -6,10 +6,10 @@ import { fromTemplate, type Template } from '../services/seed';
 import { pendingInstances } from '../utils/recurring';
 import { useFinance } from '../finance/store/useFinance';
 import { logicalToday, sleepMinutes } from '../utils/date';
-import type { AppUser, Course, DayLog, Dream, Exam, InboxItem, InboxStatus, JournalEntry, LibraryItem, Moment, Person, Settings, StudySession, TabId, Task, TaskRule, Theme, Tracker, WeekLog, YearGoal } from '../types';
+import type { AppUser, Course, DayLog, Dream, Exam, InboxItem, InboxStatus, JournalEntry, LibraryItem, Moment, Person, Settings, ShopItem, ShopTrip, StudySession, TabId, Task, TaskRule, Theme, Tracker, WeekLog, YearGoal } from '../types';
 
-export type MoreView = 'routines' | 'people' | 'dreams' | 'timeline' | 'library' | 'courses' | 'calendar' | 'stats' | 'reminders' | 'settings';
-export type ItemCol = 'taskRules' | 'courses' | 'exams' | 'sessions' | 'library' | 'journal' | 'people' | 'dreams' | 'yearGoals' | 'moments';
+export type MoreView = 'routines' | 'shopping' | 'people' | 'dreams' | 'timeline' | 'library' | 'courses' | 'calendar' | 'stats' | 'reminders' | 'settings';
+export type ItemCol = 'taskRules' | 'courses' | 'exams' | 'sessions' | 'library' | 'journal' | 'people' | 'dreams' | 'yearGoals' | 'moments' | 'shopping' | 'shopTrips';
 
 /* ── Tema ─────────────────────────────────────────────── */
 
@@ -59,6 +59,8 @@ interface AppState {
   dreams: Dream[];
   yearGoals: YearGoal[];
   moments: Moment[];
+  shopping: ShopItem[];
+  shopTrips: ShopTrip[];
   tasks: Task[];
   inbox: InboxItem[];
 
@@ -144,7 +146,7 @@ export const useStore = create<AppState>((set, get) => {
   function attach(user: AppUser, b: Backend) {
     dataSubs.forEach((u) => u());
     backend = b;
-    let pending = 16;
+    let pending = 0; // her once() bir abonelik sayar; hepsi ilk veriyi alınca hazır
     let rawPhase: number | undefined;
     const ready = () => {
       if (--pending === 0) {
@@ -152,7 +154,7 @@ export const useStore = create<AppState>((set, get) => {
         migrateV2(rawPhase).catch((e) => console.error('migrateV2', e));
       }
     };
-    const once = <T,>(fn: (v: T) => void) => { let first = true; return (v: T) => { fn(v); if (first) { first = false; ready(); } }; };
+    const once = <T,>(fn: (v: T) => void) => { pending++; let first = true; return (v: T) => { fn(v); if (first) { first = false; ready(); } }; };
 
     set({ user, dataReady: false });
     dataSubs = [
@@ -176,6 +178,8 @@ export const useStore = create<AppState>((set, get) => {
       b.watchCol<Dream>('dreams', once((dreams) => set({ dreams: dreams.sort((a, c) => a.createdAt - c.createdAt) }))),
       b.watchCol<YearGoal>('yearGoals', once((yearGoals) => set({ yearGoals: yearGoals.sort((a, c) => a.createdAt - c.createdAt) }))),
       b.watchCol<Moment>('moments', once((moments) => set({ moments }))),
+      b.watchCol<ShopItem>('shopping', once((items) => set({ shopping: items.sort((a, c) => a.createdAt - c.createdAt) }))),
+      b.watchCol<ShopTrip>('shopTrips', once((items) => set({ shopTrips: items.sort((a, c) => c.date.localeCompare(a.date) || c.createdAt - a.createdAt) }))),
       b.watchCol<InboxItem>('inbox', once((items) => set({ inbox: items.sort((a, c) => c.createdAt - a.createdAt) }))),
     ];
   }
@@ -184,7 +188,7 @@ export const useStore = create<AppState>((set, get) => {
     dataSubs.forEach((u) => u());
     dataSubs = [];
     backend = null;
-    set({ user: null, dataReady: false, trackers: [], days: {}, weeks: {}, rules: [], courses: [], exams: [], sessions: [], library: [], journal: [], people: [], dreams: [], yearGoals: [], moments: [], tasks: [], inbox: [], settings: defaultSettings() });
+    set({ user: null, dataReady: false, trackers: [], days: {}, weeks: {}, rules: [], courses: [], exams: [], sessions: [], library: [], journal: [], people: [], dreams: [], yearGoals: [], moments: [], shopping: [], shopTrips: [], tasks: [], inbox: [], settings: defaultSettings() });
   }
 
   return {
@@ -210,6 +214,8 @@ export const useStore = create<AppState>((set, get) => {
     dreams: [],
     yearGoals: [],
     moments: [],
+    shopping: [],
+    shopTrips: [],
     tasks: [],
     inbox: [],
 

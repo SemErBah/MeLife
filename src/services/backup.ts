@@ -22,6 +22,13 @@ export function downloadFullBackup() {
       exams: s.exams,
       sessions: s.sessions,
       library: s.library,
+      journal: s.journal,
+      people: s.people,
+      dreams: s.dreams,
+      yearGoals: s.yearGoals,
+      moments: s.moments,
+      shopping: s.shopping,
+      shopTrips: s.shopTrips,
     },
     para: {
       userConfig: f.userConfig,

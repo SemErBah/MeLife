@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   isOpen: boolean;
@@ -27,7 +28,8 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  return (
+  // Sayfa geçiş animasyonu (transform) fixed konumu sayfaya hapsetmesin: pencere doğrudan body'de çizilir
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[999] flex items-end md:items-center justify-center md:p-6" role="dialog" aria-modal="true" aria-label={title}>
@@ -86,6 +88,7 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

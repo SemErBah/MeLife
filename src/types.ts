@@ -306,3 +306,29 @@ export interface AppUser {
   photo?: string;
   local?: boolean;
 }
+
+/* ── Alışveriş ─────────────────────────────────────────── */
+
+export interface ShopItem {
+  id: string;
+  name: string;
+  qty?: string;          // serbest: "2", "1 kg", "3 paket"
+  note?: string;
+  done?: boolean;        // sepete atıldı
+  createdAt: number;
+}
+
+export interface ShopLine {
+  name: string;
+  qty?: string;
+  price?: number;        // satırın toplam fiyatı (₺)
+}
+
+export interface ShopTrip {
+  id: string;
+  date: string;
+  store?: string;
+  items: ShopLine[];
+  total: number;
+  createdAt: number;
+}
